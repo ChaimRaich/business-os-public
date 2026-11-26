@@ -18,6 +18,7 @@ export const DOCUMENT_STATUS_LABELS: Record<DocumentStatus, string> = {
   extracting: "בקריאה",
   review: "ממתין לבדיקה",
   failed: "הקריאה נכשלה",
+  approved: "אושר",
 };
 
 export const DOCUMENT_TYPES: DocumentType[] = ["delivery_note", "tax_invoice", "tax_invoice_receipt", "other"];
@@ -38,6 +39,13 @@ export type LineInput = {
   quantity: string;
   unit_cost: string;
   retail_price: string;
+  /** Empty means automatic: the product's value or the supplier's pricing rule. */
+  sale_price: string;
+  club_price: string;
+  product_type: string;
+  material: string;
+  /** The catalog item the user linked by hand, which automatic matching keeps. */
+  manual_variant_id: string | null;
   /** Id of the stored line this row is an untouched copy of; its flags, note and printed total are kept. */
   keep_id: string | null;
 };

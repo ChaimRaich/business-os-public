@@ -85,14 +85,14 @@ isOneToOne: false
                   ]
                 },"document_lines": {
                   Row: {
-                    "barcode": string | null,"business_id": string,"created_at": string,"description": string | null,"discount_pct": number | null,"document_id": string,"id": string,"line_total": number | null,"match_method": string | null,"note": string | null,"position": number,"quantity": number | null,"retail_price": number | null,"supplier_sku": string | null,"uncertain_fields": (string)[],"unit": string | null,"unit_cost": number | null,"variant_id": string | null,"variant_text": string | null
+                    "sale_price": number | null,"club_price": number | null,"product_type": Database["public"]['Enums']["product_type"] | null,"material": Database["public"]['Enums']["material"] | null,"guessed_type": Database["public"]['Enums']["product_type"] | null,"barcode": string | null,"business_id": string,"created_at": string,"description": string | null,"discount_pct": number | null,"document_id": string,"id": string,"line_total": number | null,"match_method": string | null,"note": string | null,"position": number,"quantity": number | null,"retail_price": number | null,"supplier_sku": string | null,"uncertain_fields": (string)[],"unit": string | null,"unit_cost": number | null,"variant_id": string | null,"variant_text": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "barcode"?: string | null,"business_id": string,"created_at"?: string,"description"?: string | null,"discount_pct"?: number | null,"document_id": string,"id"?: string,"line_total"?: number | null,"match_method"?: string | null,"note"?: string | null,"position": number,"quantity"?: number | null,"retail_price"?: number | null,"supplier_sku"?: string | null,"uncertain_fields"?: (string)[],"unit"?: string | null,"unit_cost"?: number | null,"variant_id"?: string | null,"variant_text"?: string | null
+                    "sale_price"?: number | null,"club_price"?: number | null,"product_type"?: Database["public"]['Enums']["product_type"] | null,"material"?: Database["public"]['Enums']["material"] | null,"guessed_type"?: never,"barcode"?: string | null,"business_id": string,"created_at"?: string,"description"?: string | null,"discount_pct"?: number | null,"document_id": string,"id"?: string,"line_total"?: number | null,"match_method"?: string | null,"note"?: string | null,"position": number,"quantity"?: number | null,"retail_price"?: number | null,"supplier_sku"?: string | null,"uncertain_fields"?: (string)[],"unit"?: string | null,"unit_cost"?: number | null,"variant_id"?: string | null,"variant_text"?: string | null
                   }
                   Update: {
-                    "barcode"?: string | null,"business_id"?: string,"created_at"?: string,"description"?: string | null,"discount_pct"?: number | null,"document_id"?: string,"id"?: string,"line_total"?: number | null,"match_method"?: string | null,"note"?: string | null,"position"?: number,"quantity"?: number | null,"retail_price"?: number | null,"supplier_sku"?: string | null,"uncertain_fields"?: (string)[],"unit"?: string | null,"unit_cost"?: number | null,"variant_id"?: string | null,"variant_text"?: string | null
+                    "sale_price"?: number | null,"club_price"?: number | null,"product_type"?: Database["public"]['Enums']["product_type"] | null,"material"?: Database["public"]['Enums']["material"] | null,"guessed_type"?: never,"barcode"?: string | null,"business_id"?: string,"created_at"?: string,"description"?: string | null,"discount_pct"?: number | null,"document_id"?: string,"id"?: string,"line_total"?: number | null,"match_method"?: string | null,"note"?: string | null,"position"?: number,"quantity"?: number | null,"retail_price"?: number | null,"supplier_sku"?: string | null,"uncertain_fields"?: (string)[],"unit"?: string | null,"unit_cost"?: number | null,"variant_id"?: string | null,"variant_text"?: string | null
                   }
                   Relationships: [
                     {
@@ -111,14 +111,14 @@ isOneToOne: false
                   ]
                 },"documents": {
                   Row: {
-                    "business_id": string,"created_at": string,"created_by": string | null,"doc_date": string | null,"doc_number": string | null,"doc_type": Database["public"]['Enums']["document_type"] | null,"extracted_at": string | null,"extraction_error": string | null,"extraction_model": string | null,"extraction_notes": string | null,"extraction_started_at": string | null,"id": string,"printed_quantity": number | null,"printed_subtotal": number | null,"printed_total": number | null,"printed_vat": number | null,"status": Database["public"]['Enums']["document_status"],"supplier_id": string | null,"supplier_name_raw": string | null,"supplier_tax_id_raw": string | null,"vat_rate": number | null,"warehouse_id": string
+                    "approved_at": string | null,"approved_by": string | null,"business_id": string,"created_at": string,"created_by": string | null,"doc_date": string | null,"doc_number": string | null,"doc_type": Database["public"]['Enums']["document_type"] | null,"extracted_at": string | null,"extraction_error": string | null,"extraction_model": string | null,"extraction_notes": string | null,"extraction_started_at": string | null,"id": string,"printed_quantity": number | null,"printed_subtotal": number | null,"printed_total": number | null,"printed_vat": number | null,"status": Database["public"]['Enums']["document_status"],"supplier_id": string | null,"supplier_name_raw": string | null,"supplier_tax_id_raw": string | null,"vat_rate": number | null,"warehouse_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "business_id": string,"created_at"?: string,"created_by"?: string | null,"doc_date"?: string | null,"doc_number"?: string | null,"doc_type"?: Database["public"]['Enums']["document_type"] | null,"extracted_at"?: string | null,"extraction_error"?: string | null,"extraction_model"?: string | null,"extraction_notes"?: string | null,"extraction_started_at"?: string | null,"id": string,"printed_quantity"?: number | null,"printed_subtotal"?: number | null,"printed_total"?: number | null,"printed_vat"?: number | null,"status"?: Database["public"]['Enums']["document_status"],"supplier_id"?: string | null,"supplier_name_raw"?: string | null,"supplier_tax_id_raw"?: string | null,"vat_rate"?: number | null,"warehouse_id": string
+                    "approved_at"?: string | null,"approved_by"?: string | null,"business_id": string,"created_at"?: string,"created_by"?: string | null,"doc_date"?: string | null,"doc_number"?: string | null,"doc_type"?: Database["public"]['Enums']["document_type"] | null,"extracted_at"?: string | null,"extraction_error"?: string | null,"extraction_model"?: string | null,"extraction_notes"?: string | null,"extraction_started_at"?: string | null,"id": string,"printed_quantity"?: number | null,"printed_subtotal"?: number | null,"printed_total"?: number | null,"printed_vat"?: number | null,"status"?: Database["public"]['Enums']["document_status"],"supplier_id"?: string | null,"supplier_name_raw"?: string | null,"supplier_tax_id_raw"?: string | null,"vat_rate"?: number | null,"warehouse_id": string
                   }
                   Update: {
-                    "business_id"?: string,"created_at"?: string,"created_by"?: string | null,"doc_date"?: string | null,"doc_number"?: string | null,"doc_type"?: Database["public"]['Enums']["document_type"] | null,"extracted_at"?: string | null,"extraction_error"?: string | null,"extraction_model"?: string | null,"extraction_notes"?: string | null,"extraction_started_at"?: string | null,"id"?: string,"printed_quantity"?: number | null,"printed_subtotal"?: number | null,"printed_total"?: number | null,"printed_vat"?: number | null,"status"?: Database["public"]['Enums']["document_status"],"supplier_id"?: string | null,"supplier_name_raw"?: string | null,"supplier_tax_id_raw"?: string | null,"vat_rate"?: number | null,"warehouse_id"?: string
+                    "approved_at"?: string | null,"approved_by"?: string | null,"business_id"?: string,"created_at"?: string,"created_by"?: string | null,"doc_date"?: string | null,"doc_number"?: string | null,"doc_type"?: Database["public"]['Enums']["document_type"] | null,"extracted_at"?: string | null,"extraction_error"?: string | null,"extraction_model"?: string | null,"extraction_notes"?: string | null,"extraction_started_at"?: string | null,"id"?: string,"printed_quantity"?: number | null,"printed_subtotal"?: number | null,"printed_total"?: number | null,"printed_vat"?: number | null,"status"?: Database["public"]['Enums']["document_status"],"supplier_id"?: string | null,"supplier_name_raw"?: string | null,"supplier_tax_id_raw"?: string | null,"vat_rate"?: number | null,"warehouse_id"?: string
                   }
                   Relationships: [
                     {
@@ -163,14 +163,14 @@ isOneToOne: false
                   ]
                 },"products": {
                   Row: {
-                    "business_id": string,"created_at": string,"id": string,"name": string,"notes": string | null,"supplier_id": string | null
+                    "product_type": Database["public"]['Enums']["product_type"] | null,"material": Database["public"]['Enums']["material"] | null,"sale_price": number | null,"club_price": number | null,"business_id": string,"created_at": string,"id": string,"name": string,"notes": string | null,"supplier_id": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "business_id": string,"created_at"?: string,"id"?: string,"name": string,"notes"?: string | null,"supplier_id"?: string | null
+                    "product_type"?: Database["public"]['Enums']["product_type"] | null,"material"?: Database["public"]['Enums']["material"] | null,"sale_price"?: number | null,"club_price"?: number | null,"business_id": string,"created_at"?: string,"id"?: string,"name": string,"notes"?: string | null,"supplier_id"?: string | null
                   }
                   Update: {
-                    "business_id"?: string,"created_at"?: string,"id"?: string,"name"?: string,"notes"?: string | null,"supplier_id"?: string | null
+                    "product_type"?: Database["public"]['Enums']["product_type"] | null,"material"?: Database["public"]['Enums']["material"] | null,"sale_price"?: number | null,"club_price"?: number | null,"business_id"?: string,"created_at"?: string,"id"?: string,"name"?: string,"notes"?: string | null,"supplier_id"?: string | null
                   }
                   Relationships: [
                     {
@@ -201,16 +201,75 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
-                },"suppliers": {
+                },"departments": {
                   Row: {
-                    "address": string | null,"business_id": string,"created_at": string,"id": string,"name": string,"notes": string | null,"phone": string | null,"pos_code": string | null,"pos_name": string | null,"tax_id": string | null
+                    "business_id": string,"code": number,"department": string,"product_type": Database["public"]['Enums']["product_type"],"sub_department": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "address"?: string | null,"business_id": string,"created_at"?: string,"id"?: string,"name": string,"notes"?: string | null,"phone"?: string | null,"pos_code"?: string | null,"pos_name"?: string | null,"tax_id"?: string | null
+                    "business_id": string,"code": number,"department": string,"product_type": Database["public"]['Enums']["product_type"],"sub_department": string
                   }
                   Update: {
-                    "address"?: string | null,"business_id"?: string,"created_at"?: string,"id"?: string,"name"?: string,"notes"?: string | null,"phone"?: string | null,"pos_code"?: string | null,"pos_name"?: string | null,"tax_id"?: string | null
+                    "business_id"?: string,"code"?: number,"department"?: string,"product_type"?: Database["public"]['Enums']["product_type"],"sub_department"?: string
+                  }
+                  Relationships: [
+                    { foreignKeyName: "departments_business_id_fkey", columns: ["business_id"], isOneToOne: false, referencedRelation: "businesses", referencedColumns: ["id"] }
+                  ]
+                },"pos_exports": {
+                  Row: {
+                    "business_id": string,"content_base64": string,"created_at": string,"created_by": string | null,"document_id": string,"file_name": string,"id": string,"pos_status": string,"row_count": number,"template_version": string,"uploaded_at": string | null,"uploaded_by": string | null,"variant_ids": (string)[]
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"content_base64": string,"created_at"?: string,"created_by"?: string | null,"document_id": string,"file_name": string,"id"?: string,"pos_status"?: string,"row_count": number,"template_version": string,"uploaded_at"?: string | null,"uploaded_by"?: string | null,"variant_ids": (string)[]
+                  }
+                  Update: {
+                    "business_id"?: string,"content_base64"?: string,"created_at"?: string,"created_by"?: string | null,"document_id"?: string,"file_name"?: string,"id"?: string,"pos_status"?: string,"row_count"?: number,"template_version"?: string,"uploaded_at"?: string | null,"uploaded_by"?: string | null,"variant_ids"?: (string)[]
+                  }
+                  Relationships: [
+                    { foreignKeyName: "pos_exports_document_id_business_id_fkey", columns: ["document_id","business_id"], isOneToOne: true, referencedRelation: "documents", referencedColumns: ["id","business_id"] }
+                  ]
+                },"stock_balances": {
+                  Row: {
+                    "business_id": string,"quantity": number,"updated_at": string,"variant_id": string,"warehouse_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"quantity": number,"updated_at"?: string,"variant_id": string,"warehouse_id": string
+                  }
+                  Update: {
+                    "business_id"?: string,"quantity"?: number,"updated_at"?: string,"variant_id"?: string,"warehouse_id"?: string
+                  }
+                  Relationships: [
+                    { foreignKeyName: "stock_balances_variant_id_business_id_fkey", columns: ["variant_id","business_id"], isOneToOne: false, referencedRelation: "product_variants", referencedColumns: ["id","business_id"] },
+                    { foreignKeyName: "stock_balances_warehouse_id_business_id_fkey", columns: ["warehouse_id","business_id"], isOneToOne: false, referencedRelation: "warehouses", referencedColumns: ["id","business_id"] }
+                  ]
+                },"stock_movements": {
+                  Row: {
+                    "business_id": string,"created_at": string,"created_by": string | null,"document_id": string | null,"id": string,"kind": Database["public"]['Enums']["movement_kind"],"quantity": number,"reason": string | null,"request_id": string | null,"variant_id": string,"warehouse_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"created_at"?: string,"created_by"?: string | null,"document_id"?: string | null,"id"?: string,"kind": Database["public"]['Enums']["movement_kind"],"quantity": number,"reason"?: string | null,"request_id"?: string | null,"variant_id": string,"warehouse_id": string
+                  }
+                  Update: {
+                    "business_id"?: string,"created_at"?: string,"created_by"?: string | null,"document_id"?: string | null,"id"?: string,"kind"?: Database["public"]['Enums']["movement_kind"],"quantity"?: number,"reason"?: string | null,"request_id"?: string | null,"variant_id"?: string,"warehouse_id"?: string
+                  }
+                  Relationships: [
+                    { foreignKeyName: "stock_movements_document_id_business_id_fkey", columns: ["document_id","business_id"], isOneToOne: false, referencedRelation: "documents", referencedColumns: ["id","business_id"] },
+                    { foreignKeyName: "stock_movements_variant_id_business_id_fkey", columns: ["variant_id","business_id"], isOneToOne: false, referencedRelation: "product_variants", referencedColumns: ["id","business_id"] },
+                    { foreignKeyName: "stock_movements_warehouse_id_business_id_fkey", columns: ["warehouse_id","business_id"], isOneToOne: false, referencedRelation: "warehouses", referencedColumns: ["id","business_id"] }
+                  ]
+                },"suppliers": {
+                  Row: {
+                    "club_multiplier": number,"sale_markup_pct": number,"next_barcode_number": number,"address": string | null,"business_id": string,"created_at": string,"id": string,"name": string,"notes": string | null,"phone": string | null,"pos_code": string | null,"pos_name": string | null,"tax_id": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "club_multiplier"?: number,"sale_markup_pct"?: number,"next_barcode_number"?: number,"address"?: string | null,"business_id": string,"created_at"?: string,"id"?: string,"name": string,"notes"?: string | null,"phone"?: string | null,"pos_code"?: string | null,"pos_name"?: string | null,"tax_id"?: string | null
+                  }
+                  Update: {
+                    "club_multiplier"?: number,"sale_markup_pct"?: number,"next_barcode_number"?: number,"address"?: string | null,"business_id"?: string,"created_at"?: string,"id"?: string,"name"?: string,"notes"?: string | null,"phone"?: string | null,"pos_code"?: string | null,"pos_name"?: string | null,"tax_id"?: string | null
                   }
                   Relationships: [
                     {
@@ -223,14 +282,14 @@ isOneToOne: false
                   ]
                 },"variant_codes": {
                   Row: {
-                    "business_id": string,"code": string,"code_norm": string | null,"created_at": string,"id": string,"kind": Database["public"]['Enums']["code_kind"],"supplier_id": string | null,"variant_id": string
+                    "allocated": boolean,"business_id": string,"code": string,"code_norm": string | null,"created_at": string,"id": string,"kind": Database["public"]['Enums']["code_kind"],"supplier_id": string | null,"variant_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "business_id": string,"code": string,"code_norm"?: never,"created_at"?: string,"id"?: string,"kind": Database["public"]['Enums']["code_kind"],"supplier_id"?: string | null,"variant_id": string
+                    "allocated"?: boolean,"business_id": string,"code": string,"code_norm"?: never,"created_at"?: string,"id"?: string,"kind": Database["public"]['Enums']["code_kind"],"supplier_id"?: string | null,"variant_id": string
                   }
                   Update: {
-                    "business_id"?: string,"code"?: string,"code_norm"?: never,"created_at"?: string,"id"?: string,"kind"?: Database["public"]['Enums']["code_kind"],"supplier_id"?: string | null,"variant_id"?: string
+                    "allocated"?: boolean,"business_id"?: string,"code"?: string,"code_norm"?: never,"created_at"?: string,"id"?: string,"kind"?: Database["public"]['Enums']["code_kind"],"supplier_id"?: string | null,"variant_id"?: string
                   }
                   Relationships: [
                     {
@@ -276,6 +335,27 @@ isOneToOne: false
             "add_member_by_email":
 { Args: { "p_business_id": string,"p_email": string,"p_role"?: Database["public"]['Enums']["member_role"] }; Returns: string
                            },
+"adjust_stock":
+{ Args: { "p_document_id"?: string,"p_quantity": number,"p_reason": string,"p_request_id": string,"p_variant_id": string,"p_warehouse_id": string }; Returns: boolean
+                           },
+"approve_document":
+{ Args: { "p_document_id": string }; Returns: boolean
+                           },
+"assign_internal_barcodes":
+{ Args: { "p_document_id": string }; Returns: undefined
+                           },
+"create_item_for_line":
+{ Args: { "p_label": string,"p_line_id": string,"p_material"?: Database["public"]['Enums']["material"],"p_name": string,"p_product_id": string | null,"p_product_type"?: Database["public"]['Enums']["product_type"] }; Returns: string
+                           },
+"fill_line_cost":
+{ Args: { "p_cost": number,"p_line_id": string }; Returns: undefined
+                           },
+"link_document_line":
+{ Args: { "p_line_id": string,"p_variant_id": string | null }; Returns: undefined
+                           },
+"mark_export_uploaded":
+{ Args: { "p_export_id": string }; Returns: undefined
+                           },
 "create_business":
 { Args: { "p_name": string }; Returns: string
                            },
@@ -308,7 +388,7 @@ isOneToOne: false
                            }
           }
           Enums: {
-            "code_kind": "barcode"|"supplier_sku"|"pos"|"web","document_status": "uploaded"|"extracting"|"review"|"failed","document_type": "delivery_note"|"tax_invoice"|"tax_invoice_receipt"|"other","member_role": "owner"|"manager"|"staff"
+            "code_kind": "barcode"|"supplier_sku"|"pos"|"web","document_status": "uploaded"|"extracting"|"review"|"failed"|"approved","document_type": "delivery_note"|"tax_invoice"|"tax_invoice_receipt"|"other","material": "silver"|"gold","member_role": "owner"|"manager"|"staff","movement_kind": "receipt"|"adjustment","product_type": "ring"|"earring"|"necklace"|"bracelet"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -428,7 +508,7 @@ export const Constants = {
           }
         },"public": {
           Enums: {
-            "code_kind": ["barcode", "supplier_sku", "pos", "web"],"document_status": ["uploaded", "extracting", "review", "failed"],"document_type": ["delivery_note", "tax_invoice", "tax_invoice_receipt", "other"],"member_role": ["owner", "manager", "staff"]
+            "code_kind": ["barcode", "supplier_sku", "pos", "web"],"document_status": ["uploaded", "extracting", "review", "failed", "approved"],"document_type": ["delivery_note", "tax_invoice", "tax_invoice_receipt", "other"],"material": ["silver", "gold"],"member_role": ["owner", "manager", "staff"],"movement_kind": ["receipt", "adjustment"],"product_type": ["ring", "earring", "necklace", "bracelet"]
           }
         }
 } as const

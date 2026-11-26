@@ -11,6 +11,7 @@ const STATUS_STYLES = {
   extracting: "bg-canvas text-muted",
   review: "bg-accent-soft text-accent-strong",
   failed: "bg-danger-soft text-danger",
+  approved: "bg-accent text-white",
 } as const;
 
 export default async function ReceivingPage() {

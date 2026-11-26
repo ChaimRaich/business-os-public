@@ -13,6 +13,8 @@ import {
   type CodeKind,
 } from "@/lib/catalog";
 import type { FormState } from "@/components/action-form";
+import { parseAmount } from "@/lib/documents";
+import { asMaterial, asProductType } from "@/lib/pricing";
 
 type VariantInput = {
   label: string;
@@ -139,6 +141,11 @@ export async function updateProduct(_: FormState, formData: FormData): Promise<F
   if (!id || !name) {
     return { error: "יש להזין שם מוצר." };
   }
+  const salePrice = parseAmount(text(formData, "sale_price"));
+  const clubPrice = parseAmount(text(formData, "club_price"));
+  if (salePrice === undefined || clubPrice === undefined || salePrice === 0 || clubPrice === 0) {
+    return { error: "מחיר צריך להיות מספר גדול מאפס, או ריק." };
+  }
 
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -147,6 +154,10 @@ export async function updateProduct(_: FormState, formData: FormData): Promise<F
       name,
       supplier_id: optional(formData, "supplier_id"),
       notes: optional(formData, "notes"),
+      product_type: asProductType(formData.get("product_type")),
+      material: asMaterial(formData.get("material")),
+      sale_price: salePrice,
+      club_price: clubPrice,
     })
     .eq("id", id)
     .eq("business_id", active.businessId)

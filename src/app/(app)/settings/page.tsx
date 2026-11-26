@@ -4,6 +4,7 @@ import { requireBusiness } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { can, ROLE_LABELS, ROLES } from "@/lib/permissions";
 import { ActionForm } from "@/components/action-form";
+import { DepartmentsSettings } from "@/components/departments-settings";
 import {
   addMember,
   addWarehouse,
@@ -126,6 +127,8 @@ export default async function SettingsPage() {
           </ActionForm>
         )}
       </section>
+
+      <DepartmentsSettings businessId={active.businessId} canManage={can(active.role, "departments.manage")} />
 
       <section className="card">
         <h2 className="mb-4 font-semibold">משתמשים והרשאות</h2>

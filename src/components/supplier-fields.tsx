@@ -6,6 +6,9 @@ type Supplier = {
   pos_code: string | null;
   pos_name: string | null;
   notes: string | null;
+  club_multiplier: number;
+  sale_markup_pct: number;
+  next_barcode_number: number;
 };
 
 export function SupplierFields({ supplier }: { supplier?: Supplier }) {
@@ -37,6 +40,22 @@ export function SupplierFields({ supplier }: { supplier?: Supplier }) {
       </div>
       <p id="supplier-pos-hint" className="text-xs text-muted sm:col-span-2">
         הקוד והשם כפי שהם מוגדרים בקופה. הם ייכנסו לקובץ ה-Excel; אפשר להשלים אותם מאוחר יותר.
+      </p>
+      <div>
+        <label className="label" htmlFor="supplier-club-multiplier">מחיר מועדון = עלות לפני מע״מ כפול</label>
+        <input className="field" id="supplier-club-multiplier" name="club_multiplier" dir="ltr" inputMode="decimal" defaultValue={supplier?.club_multiplier ?? 2.9} required />
+      </div>
+      <div>
+        <label className="label" htmlFor="supplier-sale-markup">מחיר מכירה = מועדון ועוד (אחוזים)</label>
+        <input className="field" id="supplier-sale-markup" name="sale_markup_pct" dir="ltr" inputMode="decimal" defaultValue={supplier?.sale_markup_pct ?? 10} required />
+      </div>
+      <div>
+        <label className="label" htmlFor="supplier-next-barcode">המספר הרץ הבא לברקוד פנימי</label>
+        <input className="field" id="supplier-next-barcode" name="next_barcode_number" dir="ltr" inputMode="numeric" defaultValue={supplier?.next_barcode_number ?? 1} aria-describedby="supplier-barcode-hint" required />
+      </div>
+      <p id="supplier-barcode-hint" className="self-end text-xs text-muted">
+        הברקוד: N, קוד הספק בקופה ו-6 ספרות. אם בקופה כבר יש ברקודים לספק, התחילו אחרי האחרון שבהם: המערכת לא רואה
+        את מה שקיים רק בקופה.
       </p>
       <div className="sm:col-span-2">
         <label className="label" htmlFor="supplier-notes">הערות</label>

@@ -15,6 +15,7 @@ import { ExtractionRunner } from "@/components/extraction-runner";
 import { LinesEditor, type EditorLine } from "@/components/lines-editor";
 import { deleteDocument, openForManualEntry, updateDocumentHeader } from "../actions";
 import { RetryExtraction } from "./retry";
+import { ApprovedDocument } from "./approved";
 
 export const metadata: Metadata = { title: "קליטה" };
 
@@ -30,13 +31,15 @@ export default async function DocumentPage({ params }: PageProps<"/receiving/[id
   const { data: document } = await supabase
     .from("documents")
     .select(
-      `id, status, doc_type, doc_number, doc_date, supplier_id, supplier_name_raw, supplier_tax_id_raw,
+      `id, status, approved_at, doc_type, doc_number, doc_date, supplier_id, supplier_name_raw, supplier_tax_id_raw,
        printed_subtotal, printed_total, printed_quantity, extraction_notes, extraction_error, created_at,
        warehouses (name),
        document_files (id, position, storage_path, original_name, mime_type, sha256),
        document_lines (id, position, supplier_sku, barcode, description, variant_text, quantity, unit_cost,
          retail_price, line_total, uncertain_fields, note, match_method,
-         product_variants (label, products (id, name)))`,
+         sale_price, club_price, product_type, material, guessed_type,
+         product_variants (id, label, variant_codes (kind, code),
+           products (id, name, sale_price, club_price, product_type, material)))`,
     )
     .eq("id", id)
     .eq("business_id", active.businessId)
@@ -139,14 +142,46 @@ export default async function DocumentPage({ params }: PageProps<"/receiving/[id
     );
   }
 
+  if (document.status === "approved") {
+    return (
+      <div className="flex flex-col gap-6">
+        {header}
+        <ApprovedDocument documentId={document.id} businessId={active.businessId} approvedAt={document.approved_at} />
+        {viewer}
+      </div>
+    );
+  }
+
   // --- Review -----------------------------------------------------------------
 
   const lines = document.document_lines;
   const { data: suppliers } = await supabase
     .from("suppliers")
-    .select("id, name")
+    .select("id, name, club_multiplier, sale_markup_pct")
     .eq("business_id", active.businessId)
     .order("name");
+  const supplier = suppliers?.find((s) => s.id === document.supplier_id);
+
+  // For unmatched lines: products that already carry the same supplier SKU.
+  const unknownSkus = lines.flatMap((line) =>
+    !line.product_variants && line.supplier_sku ? [line.supplier_sku.toUpperCase()] : [],
+  );
+  const { data: skuCodes } =
+    document.supplier_id && unknownSkus.length > 0
+      ? await supabase
+          .from("variant_codes")
+          .select("code_norm, product_variants (products (id, name))")
+          .eq("business_id", active.businessId)
+          .eq("kind", "supplier_sku")
+          .eq("supplier_id", document.supplier_id)
+          .in("code_norm", unknownSkus)
+      : { data: [] };
+  const productsForSku = (sku: string | null) => {
+    const products = (skuCodes ?? [])
+      .filter((code) => code.code_norm === sku?.toUpperCase())
+      .map((code) => code.product_variants.products);
+    return [...new Map(products.map((product) => [product.id, product])).values()];
+  };
 
   const fingerprints = files.map((file) => file.sha256);
   const [{ data: sameFile }, { data: sameNumber }] = await Promise.all([
@@ -213,8 +248,20 @@ export default async function DocumentPage({ params }: PageProps<"/receiving/[id
     retail_price: toInput(line.retail_price),
     uncertain: line.uncertain_fields,
     note: line.note,
+    sale_price: toInput(line.sale_price),
+    club_price: toInput(line.club_price),
+    product_type: line.product_type ?? "",
+    material: line.material ?? "",
+    guessedType: line.guessed_type,
+    skuProducts: line.product_variants ? [] : productsForSku(line.supplier_sku),
     match: line.product_variants
       ? {
+          variantId: line.product_variants.id,
+          posCode: line.product_variants.variant_codes.find((code) => code.kind === "pos")?.code ?? null,
+          salePrice: line.product_variants.products.sale_price,
+          clubPrice: line.product_variants.products.club_price,
+          productType: line.product_variants.products.product_type,
+          material: line.product_variants.products.material,
           productId: line.product_variants.products.id,
           productName: line.product_variants.products.name,
           variantLabel: line.product_variants.label,
@@ -265,7 +312,7 @@ export default async function DocumentPage({ params }: PageProps<"/receiving/[id
             הערת הקריאה: {document.extraction_notes}
           </p>
         )}
-        <p className="mt-3 text-sm text-muted">המלאי לא מתעדכן בשלב הזה.</p>
+        <p className="mt-3 text-sm text-muted">המלאי יתעדכן רק אחרי אישור הקליטה, בתחתית העמוד.</p>
       </section>
 
       <section className="card">
@@ -320,7 +367,12 @@ export default async function DocumentPage({ params }: PageProps<"/receiving/[id
       </section>
 
       {viewer}
-      <LinesEditor documentId={document.id} initialLines={editorLines} />
+      <LinesEditor
+        documentId={document.id}
+        initialLines={editorLines}
+        rule={supplier ? { clubMultiplier: supplier.club_multiplier, saleMarkupPct: supplier.sale_markup_pct } : null}
+        duplicate={duplicateId !== null}
+      />
       {removal}
     </div>
   );

@@ -8,6 +8,8 @@ import { ACTIVE_BUSINESS_COOKIE, getMemberships, requireBusiness, requireUser } 
 import { ROLES, type Role } from "@/lib/permissions";
 import { catalogErrorMessage } from "@/lib/catalog";
 import type { FormState } from "@/components/action-form";
+import { asProductType, PRODUCT_TYPE_LABELS } from "@/lib/pricing";
+import { SAMPLE_DEPARTMENTS } from "@/lib/departments";
 
 // Every action re-reads the session and takes the business id from the server-side
 // context, never from the form. Postgres RLS is what actually enforces access.
@@ -231,4 +233,60 @@ export async function setDefaultWarehouse(_: FormState, formData: FormData): Pro
   }
   revalidatePath("/settings");
   return null;
+}
+
+/** Saves one product type's POS department; clearing all three fields removes it. */
+export async function saveDepartment(_: FormState, formData: FormData): Promise<FormState> {
+  const { active } = await requireBusiness();
+  const productType = asProductType(formData.get("product_type"));
+  const code = String(formData.get("code") ?? "").trim();
+  const department = String(formData.get("department") ?? "").trim();
+  const subDepartment = String(formData.get("sub_department") ?? "").trim();
+  if (!productType) {
+    return { error: GENERIC_ERROR };
+  }
+  const supabase = await createClient();
+
+  if (!code && !department && !subDepartment) {
+    const { error } = await supabase
+      .from("departments")
+      .delete()
+      .eq("business_id", active.businessId)
+      .eq("product_type", productType);
+    if (error) {
+      return { error: catalogErrorMessage(error) };
+    }
+    revalidatePath("/settings");
+    return { ok: "נמחק." };
+  }
+  if (!/^[0-9]{1,9}$/.test(code) || Number(code) === 0 || !department || !subDepartment) {
+    return { error: `${PRODUCT_TYPE_LABELS[productType]}: צריך קוד מספרי, מחלקה ותת מחלקה.` };
+  }
+  const { error } = await supabase.from("departments").upsert({
+    business_id: active.businessId,
+    product_type: productType,
+    code: Number(code),
+    department,
+    sub_department: subDepartment,
+  });
+  if (error) {
+    return { error: catalogErrorMessage(error) };
+  }
+  revalidatePath("/settings");
+  return { ok: "נשמר." };
+}
+
+/** Adds the departments seen in the POS sample file; existing entries are kept. */
+export async function fillSampleDepartments(): Promise<FormState> {
+  const { active } = await requireBusiness();
+  const supabase = await createClient();
+  const { error } = await supabase.from("departments").upsert(
+    SAMPLE_DEPARTMENTS.map((row) => ({ business_id: active.businessId, ...row })),
+    { onConflict: "business_id,product_type", ignoreDuplicates: true },
+  );
+  if (error) {
+    return { error: catalogErrorMessage(error) };
+  }
+  revalidatePath("/settings");
+  return { ok: "נוספו המחלקות מקובץ הדוגמה." };
 }

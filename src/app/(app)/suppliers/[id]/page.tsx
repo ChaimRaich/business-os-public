@@ -15,7 +15,7 @@ export default async function SupplierPage({ params }: PageProps<"/suppliers/[id
   const supabase = await createClient();
   const { data: supplier } = await supabase
     .from("suppliers")
-    .select("id, name, tax_id, phone, address, pos_code, pos_name, notes, products (id, name)")
+    .select("id, name, tax_id, phone, address, pos_code, pos_name, notes, club_multiplier, sale_markup_pct, next_barcode_number, products (id, name)")
     .eq("id", id)
     .eq("business_id", active.businessId)
     .order("name", { referencedTable: "products" })

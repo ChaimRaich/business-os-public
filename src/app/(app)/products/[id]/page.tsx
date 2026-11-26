@@ -6,6 +6,8 @@ import { createClient } from "@/lib/supabase/server";
 import { can } from "@/lib/permissions";
 import { CODE_KIND_LABELS, CODE_KINDS } from "@/lib/catalog";
 import { ActionForm } from "@/components/action-form";
+import { ProductStock } from "@/components/product-stock";
+import { MATERIAL_LABELS, MATERIALS, PRODUCT_TYPE_LABELS, PRODUCT_TYPES } from "@/lib/pricing";
 import {
   addCode,
   addVariant,
@@ -28,7 +30,7 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
     supabase
       .from("products")
       .select(
-        "id, name, notes, supplier_id, product_variants (id, label, created_at, variant_codes (id, kind, code, created_at, suppliers (name)))",
+        "id, name, notes, supplier_id, product_type, material, sale_price, club_price, product_variants (id, label, created_at, variant_codes (id, kind, code, created_at, suppliers (name)))",
       )
       .eq("id", id)
       .eq("business_id", active.businessId)
@@ -76,9 +78,37 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
               <label className="label" htmlFor="product-notes">הערות</label>
               <input className="field" id="product-notes" name="notes" defaultValue={product.notes ?? ""} />
             </div>
+            <div>
+              <label className="label" htmlFor="product-type">סוג</label>
+              <select className="field min-h-11" id="product-type" name="product_type" defaultValue={product.product_type ?? ""}>
+                <option value="">לא נבחר</option>
+                {PRODUCT_TYPES.map((type) => (
+                  <option key={type} value={type}>{PRODUCT_TYPE_LABELS[type]}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="label" htmlFor="product-material">חומר</label>
+              <select className="field min-h-11" id="product-material" name="material" defaultValue={product.material ?? ""}>
+                <option value="">לא נבחר</option>
+                {MATERIALS.map((material) => (
+                  <option key={material} value={material}>{MATERIAL_LABELS[material]}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="label" htmlFor="product-sale-price">מחיר מכירה</label>
+              <input className="field" id="product-sale-price" name="sale_price" dir="ltr" inputMode="decimal" defaultValue={product.sale_price ?? ""} />
+            </div>
+            <div>
+              <label className="label" htmlFor="product-club-price">מחיר מועדון</label>
+              <input className="field" id="product-club-price" name="club_price" dir="ltr" inputMode="decimal" defaultValue={product.club_price ?? ""} />
+            </div>
           </div>
         </ActionForm>
       </section>
+
+      <ProductStock businessId={active.businessId} variants={variants} canAdjust={can(active.role, "stock.adjust")} />
 
       {variants.map((variant) => {
         const codes = [...variant.variant_codes].sort((a, b) => a.created_at.localeCompare(b.created_at));

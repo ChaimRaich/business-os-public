@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { Loader2, Sparkles } from "lucide-react";
 import { startExtraction } from "@/app/(app)/receiving/actions";
 
 /**
@@ -22,14 +23,21 @@ export function ExtractionRunner({ documentId, alreadyRunning }: { documentId: s
   }, [documentId, alreadyRunning, router]);
 
   return (
-    <section className="card" aria-live="polite">
-      <div className="flex items-center gap-3">
-        <span className="size-5 animate-spin rounded-full border-2 border-line border-t-accent motion-reduce:animate-none" aria-hidden />
-        <h2 className="font-semibold">קוראים את המסמך…</h2>
+    <section className="card border-accent/30 bg-accent-soft/40" aria-live="polite">
+      <div className="flex items-center gap-3.5">
+        <span className="inline-flex size-11 shrink-0 items-center justify-center rounded-2xl bg-accent text-white dark:text-[#041815]">
+          <Loader2 className="size-5 animate-spin motion-reduce:animate-none" aria-hidden />
+        </span>
+        <div>
+          <h2 className="flex items-center gap-2 font-bold text-ink">
+            <span>קוראים את המסמך עם AI…</span>
+            <Sparkles className="size-4 text-accent" aria-hidden />
+          </h2>
+          <p className="mt-0.5 text-sm text-muted">
+            זה לוקח בדרך כלל עד דקה או שתיים. אפשר להשאיר את העמוד פתוח או לחזור אליו אחר כך; השורות יופיעו כאן לבדיקה.
+          </p>
+        </div>
       </div>
-      <p className="mt-2 text-sm text-muted">
-        זה לוקח בדרך כלל עד דקה או שתיים. אפשר להשאיר את העמוד פתוח או לחזור אליו אחר כך; השורות יופיעו כאן לבדיקה.
-      </p>
     </section>
   );
 }

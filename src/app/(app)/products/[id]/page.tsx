@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { AlertTriangle, ArrowRight, Barcode, Layers, Package } from "lucide-react";
 import { requireBusiness } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { can } from "@/lib/permissions";
@@ -48,15 +49,31 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <Link href="/products" className="text-sm text-muted underline-offset-4 hover:underline">
-          → כל המוצרים
+        <Link href="/products" className="back-link">
+          <ArrowRight className="size-4" aria-hidden />
+          <span>כל המוצרים</span>
         </Link>
-        <h1 className="mt-1 text-2xl font-bold">{product.name}</h1>
+        <div className="mt-2 flex flex-wrap items-center gap-3">
+          <h1 className="text-2xl font-extrabold tracking-tight">{product.name}</h1>
+          {product.product_type && (
+            <span className="badge bg-accent-soft text-accent-strong">
+              {PRODUCT_TYPE_LABELS[product.product_type]}
+            </span>
+          )}
+          {product.material && (
+            <span className="badge bg-surface-subtle text-muted">
+              {MATERIAL_LABELS[product.material]}
+            </span>
+          )}
+        </div>
       </div>
 
       <section className="card">
-        <h2 className="mb-4 font-semibold">פרטי המוצר</h2>
-        <ActionForm action={updateProduct} submitLabel="שמירה" className="flex flex-col gap-4">
+        <h2 className="section-heading mb-4">
+          <Package className="size-4.5 text-accent" aria-hidden />
+          <span>פרטי המוצר</span>
+        </h2>
+        <ActionForm action={updateProduct} submitLabel="שמירת שינויים" submitClassName="btn sm:self-start" className="flex flex-col gap-4">
           <input type="hidden" name="id" value={product.id} />
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
@@ -97,12 +114,12 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
               </select>
             </div>
             <div>
-              <label className="label" htmlFor="product-sale-price">מחיר מכירה</label>
-              <input className="field" id="product-sale-price" name="sale_price" dir="ltr" inputMode="decimal" defaultValue={product.sale_price ?? ""} />
+              <label className="label" htmlFor="product-sale-price">מחיר מכירה (₪)</label>
+              <input className="field tabular-nums" id="product-sale-price" name="sale_price" dir="ltr" inputMode="decimal" defaultValue={product.sale_price ?? ""} />
             </div>
             <div>
-              <label className="label" htmlFor="product-club-price">מחיר מועדון</label>
-              <input className="field" id="product-club-price" name="club_price" dir="ltr" inputMode="decimal" defaultValue={product.club_price ?? ""} />
+              <label className="label" htmlFor="product-club-price">מחיר מועדון (₪)</label>
+              <input className="field tabular-nums" id="product-club-price" name="club_price" dir="ltr" inputMode="decimal" defaultValue={product.club_price ?? ""} />
             </div>
           </div>
         </ActionForm>
@@ -115,8 +132,9 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
         return (
           <section key={variant.id} className="card">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <h2 className="font-semibold">
-                {hasVariants ? variant.label || "ללא שם" : "מק״טים"}
+              <h2 className="section-heading">
+                <Barcode className="size-4.5 text-accent" aria-hidden />
+                <span>{hasVariants ? variant.label || "ללא שם" : "מק״טים וברקודים"}</span>
               </h2>
               {hasVariants && (
                 <ActionForm
@@ -134,19 +152,23 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
             </div>
 
             {codes.length === 0 ? (
-              <p className="text-sm text-muted">עוד אין קודים. הוסיפו ברקוד או מק״ט כדי שאפשר יהיה למצוא את הפריט.</p>
+              <p className="rounded-xl bg-surface-subtle/60 px-4 py-3 text-sm text-muted">
+                עוד אין קודים. הוסיפו ברקוד או מק״ט כדי שאפשר יהיה למצוא את הפריט.
+              </p>
             ) : (
               <ul className="divide-y divide-line">
                 {codes.map((code) => (
-                  <li key={code.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 py-2">
-                    <span className="w-24 shrink-0 text-sm text-muted">{CODE_KIND_LABELS[code.kind]}</span>
-                    <bdi dir="ltr" className="min-w-0 flex-1 basis-32 break-all text-right font-mono">{code.code}</bdi>
-                    {code.suppliers && <span className="text-sm text-muted">{code.suppliers.name}</span>}
+                  <li key={code.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 py-2.5">
+                    <span className="badge bg-surface-subtle text-muted">{CODE_KIND_LABELS[code.kind]}</span>
+                    <bdi dir="ltr" className="min-w-0 flex-1 basis-32 break-all text-right font-mono text-sm font-medium text-ink">
+                      {code.code}
+                    </bdi>
+                    {code.suppliers && <span className="text-xs font-medium text-muted">{code.suppliers.name}</span>}
                     <ActionForm
                       action={deleteCode}
                       submitLabel="מחיקה"
                       pendingLabel="מוחק…"
-                      submitClassName="min-h-11 px-2 text-sm text-danger underline-offset-4 hover:underline"
+                      submitClassName="min-h-10 cursor-pointer px-2 text-sm font-medium text-danger underline-offset-4 hover:underline"
                     >
                       <input type="hidden" name="product_id" value={product.id} />
                       <input type="hidden" name="code_id" value={code.id} />
@@ -176,7 +198,7 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
               </div>
               <div className="min-w-0 flex-1 basis-40">
                 <label className="label" htmlFor={`code-${variant.id}`}>קוד</label>
-                <input className="field" id={`code-${variant.id}`} name="code" dir="ltr" autoComplete="off" autoCapitalize="off" spellCheck={false} maxLength={64} required />
+                <input className="field font-mono text-sm" id={`code-${variant.id}`} name="code" dir="ltr" autoComplete="off" autoCapitalize="off" spellCheck={false} maxLength={64} required />
               </div>
               <div>
                 <label className="label" htmlFor={`supplier-${variant.id}`}>ספק (למק״ט ספק)</label>
@@ -196,7 +218,7 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
                 action={deleteVariant}
                 submitLabel={`מחיקת הווריאציה ${variant.label}`}
                 pendingLabel="מוחק…"
-                submitClassName="mt-3 min-h-11 text-sm text-danger underline-offset-4 hover:underline"
+                submitClassName="mt-3 min-h-10 cursor-pointer text-sm font-medium text-danger underline-offset-4 hover:underline"
               >
                 <input type="hidden" name="product_id" value={product.id} />
                 <input type="hidden" name="variant_id" value={variant.id} />
@@ -207,8 +229,11 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
       })}
 
       <section className="card">
-        <h2 className="font-semibold">הוספת וריאציה</h2>
-        <p className="mt-1 mb-4 text-sm text-muted">
+        <h2 className="section-heading">
+          <Layers className="size-4.5 text-accent" aria-hidden />
+          <span>הוספת וריאציה</span>
+        </h2>
+        <p className="mt-1.5 mb-4 text-sm text-muted">
           מידה, צבע או כל הבדל אחר שיש לו ברקוד משלו.
           {!hasVariants && " הפריט הקיים יישאר כווריאציה ללא שם; אפשר לתת לו שם אחרי ההוספה."}
         </p>
@@ -222,16 +247,19 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
       </section>
 
       {canDelete && (
-        <section className="card border-danger/30">
-          <h2 className="font-semibold">מחיקת המוצר</h2>
-          <p className="mt-1 mb-4 text-sm text-muted">
+        <section className="card border-danger/30 bg-danger-soft/30">
+          <h2 className="section-heading text-danger">
+            <AlertTriangle className="size-4.5" aria-hidden />
+            <span>מחיקת המוצר</span>
+          </h2>
+          <p className="mt-1.5 mb-4 text-sm text-muted">
             המוצר יימחק יחד עם כל הווריאציות והקודים שלו. אי אפשר לבטל את הפעולה.
           </p>
           <ActionForm
             action={deleteProduct}
             submitLabel="מחיקת המוצר לצמיתות"
             pendingLabel="מוחק…"
-            submitClassName="btn-quiet text-danger"
+            submitClassName="btn-danger"
           >
             <input type="hidden" name="id" value={product.id} />
           </ActionForm>

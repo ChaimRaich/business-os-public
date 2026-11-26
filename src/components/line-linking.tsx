@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { Link2, Plus, Search, Unlink } from "lucide-react";
 import { createItemForLine, linkLine, searchCatalog, type CatalogHit } from "@/app/(app)/receiving/actions";
 import { MATERIAL_LABELS, MATERIALS, PRODUCT_TYPE_LABELS, PRODUCT_TYPES } from "@/lib/pricing";
 
@@ -45,20 +46,34 @@ export function LineLinking({ lineId, defaults, skuProducts, hasSupplier, disabl
   };
 
   return (
-    <div className="mt-2 w-full">
+    <div className="mt-2.5 w-full">
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" className="btn-quiet py-1 text-sm" disabled={disabled || !hasSupplier} aria-expanded={panel === "create"} onClick={() => toggle("create")}>
-          יצירת מוצר חדש
+        <button
+          type="button"
+          className={`btn-quiet min-h-9 px-3 py-1 text-xs ${panel === "create" ? "border-accent bg-accent-soft text-accent-strong" : ""}`}
+          disabled={disabled || !hasSupplier}
+          aria-expanded={panel === "create"}
+          onClick={() => toggle("create")}
+        >
+          <Plus className="size-3.5" aria-hidden />
+          <span>יצירת מוצר חדש</span>
         </button>
-        <button type="button" className="btn-quiet py-1 text-sm" disabled={disabled} aria-expanded={panel === "link"} onClick={() => toggle("link")}>
-          שיוך למוצר קיים
+        <button
+          type="button"
+          className={`btn-quiet min-h-9 px-3 py-1 text-xs ${panel === "link" ? "border-accent bg-accent-soft text-accent-strong" : ""}`}
+          disabled={disabled}
+          aria-expanded={panel === "link"}
+          onClick={() => toggle("link")}
+        >
+          <Link2 className="size-3.5" aria-hidden />
+          <span>שיוך למוצר קיים</span>
         </button>
         {disabled && <span className="text-xs text-muted">שמרו את השורות כדי לשייך.</span>}
         {!disabled && !hasSupplier && <span className="text-xs text-muted">ליצירת מוצר צריך לבחור ספק למסמך.</span>}
       </div>
 
       {panel === "create" && !disabled && (
-        <div className="mt-3 grid gap-3 rounded-lg border border-line p-3 sm:grid-cols-2">
+        <div className="card-subtle mt-3 grid gap-3 sm:grid-cols-2">
           {skuProducts.length > 0 && (
             <div className="sm:col-span-2">
               <label className="label" htmlFor={`target-${lineId}`}>להוסיף אל</label>
@@ -123,7 +138,7 @@ export function LineLinking({ lineId, defaults, skuProducts, hasSupplier, disabl
       )}
 
       {panel === "link" && !disabled && (
-        <div className="mt-3 rounded-lg border border-line p-3">
+        <div className="card-subtle mt-3">
           <form
             className="flex flex-wrap items-end gap-2"
             onSubmit={(event) => {
@@ -135,19 +150,27 @@ export function LineLinking({ lineId, defaults, skuProducts, hasSupplier, disabl
               <label className="label" htmlFor={`search-${lineId}`}>חיפוש לפי שם, ברקוד או מק״ט</label>
               <input className="field" id={`search-${lineId}`} type="search" value={query} onChange={(e) => setQuery(e.target.value)} />
             </div>
-            <button type="submit" className="btn-quiet" disabled={pending}>חיפוש</button>
+            <button type="submit" className="btn-quiet" disabled={pending}>
+              <Search className="size-4" aria-hidden />
+              <span>חיפוש</span>
+            </button>
           </form>
-          {hits?.length === 0 && <p className="mt-2 text-sm text-muted">לא נמצאו מוצרים.</p>}
+          {hits?.length === 0 && <p className="mt-2.5 text-sm text-muted">לא נמצאו מוצרים.</p>}
           {hits && hits.length > 0 && (
-            <ul className="mt-2 max-h-64 divide-y divide-line overflow-y-auto">
+            <ul className="mt-3 max-h-64 divide-y divide-line overflow-y-auto rounded-xl border border-line bg-surface px-3">
               {hits.map((hit) => (
-                <li key={hit.variantId} className="flex flex-wrap items-center gap-x-3 py-2 text-sm">
-                  <span className="min-w-0 flex-1 basis-48">
+                <li key={hit.variantId} className="flex flex-wrap items-center gap-x-3 py-2.5 text-sm">
+                  <span className="min-w-0 flex-1 basis-48 font-medium text-ink">
                     {hit.productName}
-                    {hit.variantLabel && ` · ${hit.variantLabel}`}
+                    {hit.variantLabel && <span className="text-muted"> · {hit.variantLabel}</span>}
                     <bdi dir="ltr" className="block text-right font-mono text-xs text-muted">{hit.codes.join(" · ")}</bdi>
                   </span>
-                  <button type="button" className="btn-quiet py-1 text-sm" disabled={pending} onClick={() => run(() => linkLine(lineId, hit.variantId))}>
+                  <button
+                    type="button"
+                    className="btn-quiet min-h-8 px-3 py-1 text-xs"
+                    disabled={pending}
+                    onClick={() => run(() => linkLine(lineId, hit.variantId))}
+                  >
                     שיוך
                   </button>
                 </li>
@@ -156,7 +179,7 @@ export function LineLinking({ lineId, defaults, skuProducts, hasSupplier, disabl
           )}
         </div>
       )}
-      <p aria-live="polite" className="mt-2 text-sm text-danger empty:hidden">{error}</p>
+      <p aria-live="polite" className="mt-2 text-sm font-medium text-danger empty:hidden">{error}</p>
     </div>
   );
 }
@@ -168,7 +191,7 @@ export function UnlinkButton({ lineId, disabled }: { lineId: string; disabled: b
     <>
       <button
         type="button"
-        className="text-danger underline-offset-2 hover:underline disabled:opacity-50"
+        className="inline-flex cursor-pointer items-center gap-1 font-medium text-danger underline-offset-2 hover:underline disabled:opacity-50"
         disabled={disabled || pending}
         onClick={() =>
           startTransition(async () => {
@@ -180,7 +203,8 @@ export function UnlinkButton({ lineId, disabled }: { lineId: string; disabled: b
           })
         }
       >
-        ביטול השיוך
+        <Unlink className="size-3" aria-hidden />
+        <span>ביטול השיוך</span>
       </button>
       {error && <span className="text-danger">{error}</span>}
     </>

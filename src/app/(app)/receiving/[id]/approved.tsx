@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AlertTriangle, CheckCircle2, Download, FileSpreadsheet, Lock, TableProperties } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { loadExportData } from "@/lib/export-data";
 import { planExport } from "@/lib/pos-export";
@@ -48,36 +49,45 @@ export async function ApprovedDocument({
 
   return (
     <>
-      <p className="rounded-lg bg-accent-soft px-4 py-3 text-sm text-accent-strong">
-        הקליטה אושרה{approvedAt && ` ב-${formatDateTime(approvedAt)}`} והמלאי עודכן. השורות נעולות לעריכה.
-        {document.suppliers && ` ספק: ${document.suppliers.name}.`}
-      </p>
+      <div className="flex items-start gap-3 rounded-2xl border border-accent/30 bg-accent-soft px-4 py-3.5 text-sm text-accent-strong">
+        <Lock className="mt-0.5 size-4 shrink-0" aria-hidden />
+        <p>
+          הקליטה אושרה{approvedAt && ` ב-${formatDateTime(approvedAt)}`} והמלאי עודכן. השורות נעולות לעריכה.
+          {document.suppliers && ` ספק: ${document.suppliers.name}.`}
+        </p>
+      </div>
 
       <section className="card">
-        <h2 className="mb-3 font-semibold">קובץ לקופה</h2>
+        <h2 className="section-heading mb-3">
+          <FileSpreadsheet className="size-4.5 text-accent" aria-hidden />
+          <span>קובץ לקופה</span>
+        </h2>
         {record ? (
           <div className="flex flex-col gap-4">
-            <p className="text-sm">
-              הקובץ נוצר ב-{formatDateTime(record.created_at)}, {record.row_count} פריטים. הורדה חוזרת מחזירה את
+            <p className="text-sm text-muted">
+              הקובץ נוצר ב-{formatDateTime(record.created_at)}, <strong className="text-ink">{record.row_count} פריטים</strong>. הורדה חוזרת מחזירה את
               אותו קובץ ולא משנה את המלאי.
             </p>
             {/* A plain link: the route answers with a file, not a page. */}
             <a href={`/receiving/${documentId}/export`} download className="btn self-start">
-              הורדת קובץ לקופה
+              <Download className="size-4" aria-hidden />
+              <span>הורדת קובץ לקופה (.xls)</span>
             </a>
             {record.pos_status === "uploaded" ? (
-              <p className="text-sm font-medium text-accent">
-                ✓ הועלה לקופה בהצלחה{record.uploaded_at && ` (סומן ב-${formatDateTime(record.uploaded_at)})`}
+              <p className="inline-flex items-center gap-2 self-start rounded-xl border border-accent/25 bg-accent-soft px-3.5 py-2 text-sm font-semibold text-accent-strong">
+                <CheckCircle2 className="size-4" aria-hidden />
+                <span>הועלה לקופה בהצלחה{record.uploaded_at && ` (סומן ב-${formatDateTime(record.uploaded_at)})`}</span>
               </p>
             ) : (
-              <ActionForm action={markExportUploaded} submitLabel="סימון: הועלה לקופה בהצלחה" submitClassName="btn-quiet" className="flex flex-col items-start gap-2 border-t border-line pt-4">
+              <ActionForm action={markExportUploaded} submitLabel="סימון: הועלה לקופה בהצלחה" submitClassName="btn-quiet" className="flex flex-col items-start gap-2.5 border-t border-line pt-4">
                 <input type="hidden" name="id" value={documentId} />
                 <p className="text-sm">
-                  סטטוס בקופה: <strong>ממתין</strong>. יצירה או הורדה של הקובץ אינן אישור שהקופה קלטה אותו.
+                  סטטוס בקופה: <span className="badge bg-warning-soft text-warning">ממתין</span>{" "}
+                  <span className="text-muted">יצירה או הורדה של הקובץ אינן אישור שהקופה קלטה אותו.</span>
                 </p>
-                <label className="flex items-start gap-2 text-sm">
-                  <input type="checkbox" name="confirm" className="mt-1" />
-                  העליתי את הקובץ לקופה והיא קלטה אותו.
+                <label className="flex cursor-pointer items-start gap-2 text-sm">
+                  <input type="checkbox" name="confirm" className="mt-1 accent-accent" />
+                  <span>העליתי את הקובץ לקופה והיא קלטה אותו.</span>
                 </label>
               </ActionForm>
             )}
@@ -85,13 +95,13 @@ export async function ApprovedDocument({
         ) : !data || !plan ? (
           <p className="text-sm text-danger">לא הצלחנו להכין את נתוני הקובץ. בדקו שלמסמך יש ספק ושכל השורות משויכות.</p>
         ) : plan.problems.length > 0 ? (
-          <div>
-            <p className="text-sm">אי אפשר ליצור את הקובץ עד שכל הפרטים האלה יושלמו:</p>
-            <ul className="mt-2 flex list-disc flex-col gap-1 ps-5 text-sm">
+          <div className="rounded-xl border border-warning-border/45 bg-warning-soft/60 p-4">
+            <p className="text-sm font-semibold text-warning">אי אפשר ליצור את הקובץ עד שכל הפרטים האלה יושלמו:</p>
+            <ul className="mt-2 flex list-disc flex-col gap-1.5 ps-5 text-sm text-ink">
               {plan.problems.map((problem) => (
                 <li key={problem.message}>
                   {problem.message}{" "}
-                  <Link href={problem.href.startsWith("#") ? `/receiving/${documentId}${problem.href}` : problem.href} className="font-medium text-accent underline underline-offset-4">
+                  <Link href={problem.href.startsWith("#") ? `/receiving/${documentId}${problem.href}` : problem.href} className="font-semibold text-accent underline underline-offset-4">
                     {problem.action}
                   </Link>
                 </li>
@@ -103,20 +113,23 @@ export async function ApprovedDocument({
             <input type="hidden" name="id" value={documentId} />
             <p className="text-sm text-muted">כל הפרטים מלאים. הקובץ נוצר פעם אחת ונשמר.</p>
             {data.existingInPos.length > 0 && (
-              <div className="rounded-lg border border-amber-500 bg-amber-50 p-3 text-sm text-amber-900">
-                <p className="font-semibold">⚠ ייתכן שהפריטים האלה כבר קיימים בקופה:</p>
-                <ul className="mt-1 list-disc ps-5">
+              <div className="rounded-xl border border-warning-border bg-warning-soft p-4 text-sm text-warning">
+                <p className="flex items-center gap-2 font-bold">
+                  <AlertTriangle className="size-4 shrink-0" aria-hidden />
+                  <span>ייתכן שהפריטים האלה כבר קיימים בקופה:</span>
+                </p>
+                <ul className="mt-1.5 list-disc ps-5 text-ink">
                   {data.existingInPos.map((title, index) => (
                     <li key={index}>{title}</li>
                   ))}
                 </ul>
-                <p className="mt-2">
+                <p className="mt-2 text-ink">
                   עדיין לא ידוע אם העלאה של ברקוד קיים מוסיפה לכמות בקופה, מחליפה אותה או נדחית. בדקו זאת על
                   פריט אחד לפני שמעלים את כל הקובץ.
                 </p>
-                <label className="mt-2 flex items-start gap-2">
-                  <input type="checkbox" name="confirm_existing" className="mt-1" />
-                  הבנתי, ליצור את הקובץ עם הפריטים האלה.
+                <label className="mt-3 flex cursor-pointer items-start gap-2 font-medium text-ink">
+                  <input type="checkbox" name="confirm_existing" className="mt-1 accent-accent" />
+                  <span>הבנתי, ליצור את הקובץ עם הפריטים האלה.</span>
                 </label>
               </div>
             )}
@@ -126,8 +139,8 @@ export async function ApprovedDocument({
 
       {missingCost.length > 0 && (
         <section id="missing-cost" className="card">
-          <h2 className="font-semibold">השלמת עלות חסרה</h2>
-          <p className="mt-1 mb-3 text-sm text-muted">
+          <h2 className="section-heading">השלמת עלות חסרה</h2>
+          <p className="mt-1.5 mb-3 text-sm text-muted">
             אפשר למלא עלות שלא הוזנה. עלות קיימת וכמויות אי אפשר לשנות.
           </p>
           {missingCost.map((line) => (
@@ -137,7 +150,7 @@ export async function ApprovedDocument({
                 <label className="label" htmlFor={`cost-${line.id}`}>
                   שורה {line.position}: {line.product_variants?.products.name ?? line.description}
                 </label>
-                <input className="field" id={`cost-${line.id}`} name="unit_cost" dir="ltr" inputMode="decimal" required />
+                <input className="field tabular-nums" id={`cost-${line.id}`} name="unit_cost" dir="ltr" inputMode="decimal" required />
               </div>
             </ActionForm>
           ))}
@@ -145,49 +158,57 @@ export async function ApprovedDocument({
       )}
 
       <section className="card">
-        <h2 className="mb-3 font-semibold">שורות הקליטה</h2>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[40rem] text-sm">
-            <thead className="text-muted">
-              <tr className="border-b border-line text-right">
+        <h2 className="section-heading mb-4">
+          <TableProperties className="size-4.5 text-accent" aria-hidden />
+          <span>שורות הקליטה ({document.document_lines.length})</span>
+        </h2>
+        <div className="-mx-2 overflow-x-auto px-2">
+          <table className="w-full min-w-[42rem] text-sm">
+            <thead>
+              <tr className="border-b border-line bg-surface-subtle/60 text-right text-xs font-semibold text-muted">
                 {["#", "פריט", "ברקוד בקופה", "כמות", "עלות", "מכירה", "מועדון", "סיווג", ""].map((heading, index) => (
-                  <th key={index} className="px-2 py-2 text-right font-medium">{heading}</th>
+                  <th key={index} className="px-3 py-2.5 text-right font-semibold first:rounded-s-lg last:rounded-e-lg">{heading}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
               {document.document_lines.map((line) => {
                 const variant = line.product_variants;
+                const posCode = variant?.variant_codes.find((code) => code.kind === "pos")?.code;
                 return (
-                  <tr key={line.id}>
-                    <td className="px-2 py-2 tabular-nums text-muted">{line.position}</td>
-                    <td className="px-2 py-2">
+                  <tr key={line.id} className="transition-colors hover:bg-surface-subtle/40">
+                    <td className="px-3 py-3 tabular-nums text-muted">{line.position}</td>
+                    <td className="px-3 py-3 font-medium">
                       {variant ? (
-                        <Link href={`/products/${variant.products.id}`} className="underline underline-offset-2">
+                        <Link href={`/products/${variant.products.id}`} className="text-ink underline-offset-2 hover:text-accent hover:underline">
                           {itemTitle(variant.products.name, variant.label)}
                         </Link>
                       ) : (
                         line.description
                       )}
                     </td>
-                    <td className="px-2 py-2 font-mono">
-                      <bdi dir="ltr">{variant?.variant_codes.find((code) => code.kind === "pos")?.code ?? "—"}</bdi>
+                    <td className="px-3 py-3 font-mono text-xs">
+                      {posCode ? (
+                        <bdi dir="ltr" className="rounded-md bg-surface-subtle px-2 py-0.5 text-ink">{posCode}</bdi>
+                      ) : (
+                        <span className="text-muted">—</span>
+                      )}
                     </td>
-                    <td className="px-2 py-2 tabular-nums">{line.quantity === null ? "" : formatQuantity(line.quantity)}</td>
-                    <td className="px-2 py-2 tabular-nums">{formatAmount(line.unit_cost) || "—"}</td>
-                    <td className="px-2 py-2 tabular-nums">{formatAmount(line.sale_price) || "—"}</td>
-                    <td className="px-2 py-2 tabular-nums">{formatAmount(line.club_price) || "—"}</td>
-                    <td className="px-2 py-2">
+                    <td className="px-3 py-3 font-semibold tabular-nums">{line.quantity === null ? "" : formatQuantity(line.quantity)}</td>
+                    <td className="px-3 py-3 tabular-nums">{formatAmount(line.unit_cost) || "—"}</td>
+                    <td className="px-3 py-3 tabular-nums">{formatAmount(line.sale_price) || "—"}</td>
+                    <td className="px-3 py-3 tabular-nums">{formatAmount(line.club_price) || "—"}</td>
+                    <td className="px-3 py-3 text-muted">
                       {[
                         line.product_type && PRODUCT_TYPE_LABELS[line.product_type],
                         line.material && MATERIAL_LABELS[line.material],
                       ].filter(Boolean).join(" ") || "—"}
                     </td>
-                    <td className="px-2 py-2">
+                    <td className="px-3 py-3">
                       {variant && (
                         <Link
                           href={`/stock/adjust?variant=${variant.id}&warehouse=${document.warehouse_id}&document=${documentId}`}
-                          className="whitespace-nowrap text-accent underline underline-offset-2"
+                          className="whitespace-nowrap text-xs font-semibold text-accent underline-offset-2 hover:underline"
                         >
                           התאמת מלאי
                         </Link>

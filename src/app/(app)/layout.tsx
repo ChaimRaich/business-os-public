@@ -1,14 +1,25 @@
 import { Suspense } from "react";
-import Link from "next/link";
 import { getBusinessContext } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
+import { can, ROLE_LABELS } from "@/lib/permissions";
 import { CreateBusinessCard } from "@/components/create-business-card";
-import { BusinessSwitcher } from "@/components/business-switcher";
+import { OnboardingWizard } from "@/components/onboarding-wizard";
+import { AppShell } from "@/components/app-nav";
 import { logout } from "../(auth)/actions";
 import { switchBusiness } from "./actions";
 
 export default function AppLayout({ children }: LayoutProps<"/">) {
   return (
-    <Suspense fallback={<p className="p-6 text-sm text-muted">טוען…</p>}>
+    <Suspense
+      fallback={
+        <div className="flex flex-1 items-center justify-center p-8">
+          <div className="flex items-center gap-3 rounded-2xl border border-line bg-surface px-5 py-3.5 text-sm text-muted shadow-xs">
+            <span className="size-4 animate-spin rounded-full border-2 border-line border-t-accent" aria-hidden />
+            <span>טוען את סביבת העבודה…</span>
+          </div>
+        </div>
+      }
+    >
       <Shell>{children}</Shell>
     </Suspense>
   );
@@ -23,7 +34,7 @@ async function Shell({ children }: { children: React.ReactNode }) {
       <CreateBusinessCard
         footer={
           <form action={logout}>
-            <button type="submit" className="min-h-11 px-3 underline-offset-4 hover:underline">
+            <button type="submit" className="min-h-11 px-3 underline-offset-4 hover:text-ink hover:underline">
               יציאה מהחשבון
             </button>
           </form>
@@ -33,51 +44,41 @@ async function Shell({ children }: { children: React.ReactNode }) {
   }
   const { user, memberships, active } = context;
 
+  // Mandatory end-to-end integration setup gate before entering the workspace.
+  if (!active.onboardingCompletedAt) {
+    const supabase = await createClient();
+    const { data: integrations, error } = await supabase
+      .from("business_integrations")
+      .select("id, category, provider, display_name, status, mode, account_ref, credential_hint, last_synced_at")
+      .eq("business_id", active.businessId);
+    if (error) {
+      throw new Error(`Failed to load integrations: ${error.message}`);
+    }
+
+    return (
+      <OnboardingWizard
+        businessName={active.businessName}
+        activeBusinessId={active.businessId}
+        businesses={memberships.map((m) => ({ id: m.businessId, name: m.businessName }))}
+        userEmail={user.email}
+        canManage={can(active.role, "integrations.manage")}
+        integrations={integrations}
+        switchBusiness={switchBusiness}
+        logout={logout}
+      />
+    );
+  }
+
   return (
-    <>
-      <header className="border-b border-line bg-surface">
-        <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
-          <Link href="/" className="text-sm font-semibold tracking-[0.2em] text-accent">
-            BUSINESS OS
-          </Link>
-          {memberships.length > 1 ? (
-            <BusinessSwitcher
-              action={switchBusiness}
-              activeId={active.businessId}
-              businesses={memberships.map((m) => ({ id: m.businessId, name: m.businessName }))}
-            />
-          ) : (
-            <span className="text-sm font-medium">{active.businessName}</span>
-          )}
-          <nav className="-mx-2 flex basis-full flex-wrap items-center text-sm sm:mx-0 sm:ms-auto sm:basis-auto sm:gap-1">
-            <Link href="/" className="rounded-lg px-2.5 py-2.5 hover:bg-canvas sm:px-3">
-              ראשי
-            </Link>
-            <Link href="/receiving" className="rounded-lg px-2.5 py-2.5 hover:bg-canvas sm:px-3">
-              קליטה
-            </Link>
-            <Link href="/products" className="rounded-lg px-2.5 py-2.5 hover:bg-canvas sm:px-3">
-              מוצרים
-            </Link>
-            <Link href="/suppliers" className="rounded-lg px-2.5 py-2.5 hover:bg-canvas sm:px-3">
-              ספקים
-            </Link>
-            <Link href="/settings" className="rounded-lg px-2.5 py-2.5 hover:bg-canvas sm:px-3">
-              הגדרות
-            </Link>
-            <form action={logout}>
-              <button
-                type="submit"
-                className="rounded-lg px-2.5 py-2.5 text-muted hover:bg-canvas hover:text-ink sm:px-3"
-                title={user.email}
-              >
-                יציאה
-              </button>
-            </form>
-          </nav>
-        </div>
-      </header>
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">{children}</main>
-    </>
+    <AppShell
+      userEmail={user.email}
+      roleLabel={ROLE_LABELS[active.role]}
+      activeBusiness={{ id: active.businessId, name: active.businessName }}
+      businesses={memberships.map((m) => ({ id: m.businessId, name: m.businessName }))}
+      switchBusiness={switchBusiness}
+      logout={logout}
+    >
+      {children}
+    </AppShell>
   );
 }

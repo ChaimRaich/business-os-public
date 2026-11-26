@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ArrowRight, Info } from "lucide-react";
 import { requireBusiness } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { ProductForm } from "@/components/product-form";
@@ -22,19 +23,23 @@ export default async function NewProductPage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <Link href="/products" className="text-sm text-muted underline-offset-4 hover:underline">
-          → כל המוצרים
+        <Link href="/products" className="back-link">
+          <ArrowRight className="size-4" aria-hidden />
+          <span>כל המוצרים</span>
         </Link>
-        <h1 className="mt-1 text-2xl font-bold">מוצר חדש</h1>
+        <h1 className="mt-2 text-2xl font-extrabold tracking-tight">מוצר חדש</h1>
       </div>
       {suppliers.length === 0 && (
-        <p className="rounded-lg bg-accent-soft px-4 py-3 text-sm text-accent-strong">
-          עוד אין ספקים. כדי לשמור מק״ט ספק צריך קודם{" "}
-          <Link href="/suppliers" className="font-semibold underline underline-offset-4">
-            להוסיף ספק
-          </Link>
-          .
-        </p>
+        <div className="flex items-start gap-3 rounded-2xl border border-accent/25 bg-accent-soft px-4 py-3.5 text-sm text-accent-strong">
+          <Info className="mt-0.5 size-4 shrink-0" aria-hidden />
+          <p>
+            עוד אין ספקים. כדי לשמור מק״ט ספק צריך קודם{" "}
+            <Link href="/suppliers" className="font-semibold underline underline-offset-4">
+              להוסיף ספק
+            </Link>
+            .
+          </p>
+        </div>
       )}
       <ProductForm action={createProduct} suppliers={suppliers} />
     </div>

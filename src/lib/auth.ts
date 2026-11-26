@@ -8,7 +8,12 @@ import type { Role } from "@/lib/permissions";
 export const ACTIVE_BUSINESS_COOKIE = "bos_business";
 
 export type CurrentUser = { id: string; email: string };
-export type Membership = { businessId: string; businessName: string; role: Role };
+export type Membership = {
+  businessId: string;
+  businessName: string;
+  role: Role;
+  onboardingCompletedAt: string | null;
+};
 export type BusinessContext = {
   user: CurrentUser;
   memberships: Membership[];
@@ -31,7 +36,7 @@ export const getMemberships = cache(async (): Promise<Membership[]> => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("business_members")
-    .select("role, businesses (id, name)")
+    .select("role, businesses (id, name, onboarding_completed_at)")
     .eq("user_id", user.id)
     .order("created_at");
   if (error) {
@@ -41,6 +46,7 @@ export const getMemberships = cache(async (): Promise<Membership[]> => {
     businessId: row.businesses.id,
     businessName: row.businesses.name,
     role: row.role,
+    onboardingCompletedAt: row.businesses.onboarding_completed_at,
   }));
 });
 

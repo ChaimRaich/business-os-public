@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import { ArrowRight, Info, ShieldAlert, SlidersHorizontal } from "lucide-react";
 import { requireBusiness } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { can } from "@/lib/permissions";
@@ -46,25 +47,39 @@ export default async function AdjustStockPage({ searchParams }: PageProps<"/stoc
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <Link href={`/products/${variant.products.id}`} className="text-sm text-muted underline-offset-4 hover:underline">
-          → לדף המוצר
+        <Link href={`/products/${variant.products.id}`} className="back-link">
+          <ArrowRight className="size-4" aria-hidden />
+          <span>לדף המוצר</span>
         </Link>
-        <h1 className="mt-1 text-2xl font-bold">התאמת מלאי</h1>
-        <p className="mt-1 text-sm">{itemTitle(variant.products.name, variant.label)}</p>
-        {documentId && (
-          <p className="mt-1 text-sm text-muted">
-            תיקון של{" "}
-            <Link href={`/receiving/${documentId}`} className="underline underline-offset-2">הקליטה הזו</Link>
-            . הקליטה עצמה לא משתנה; נרשמת תנועת תיקון.
-          </p>
-        )}
+        <h1 className="mt-2 text-2xl font-extrabold tracking-tight">התאמת מלאי</h1>
+        <p className="mt-1 text-base font-medium text-muted">{itemTitle(variant.products.name, variant.label)}</p>
       </div>
 
+      {documentId && (
+        <div className="flex items-start gap-3 rounded-2xl border border-accent/25 bg-accent-soft px-4 py-3.5 text-sm text-accent-strong">
+          <Info className="mt-0.5 size-4 shrink-0" aria-hidden />
+          <p>
+            תיקון של{" "}
+            <Link href={`/receiving/${documentId}`} className="font-semibold underline underline-offset-4">
+              הקליטה הזו
+            </Link>
+            . הקליטה עצמה לא משתנה; נרשמת תנועת תיקון.
+          </p>
+        </div>
+      )}
+
       <section className="card">
+        <h2 className="section-heading mb-4">
+          <SlidersHorizontal className="size-4.5 text-accent" aria-hidden />
+          <span>פרטי התנועה</span>
+        </h2>
         {!can(active.role, "stock.adjust") ? (
-          <p className="text-sm text-muted">רק בעלים או מנהל יכולים להתאים מלאי.</p>
+          <div className="flex items-center gap-3 rounded-xl bg-surface-subtle/70 px-4 py-3 text-sm text-muted">
+            <ShieldAlert className="size-4 shrink-0" aria-hidden />
+            <span>רק בעלים או מנהל יכולים להתאים מלאי.</span>
+          </div>
         ) : (
-          <ActionForm action={adjustStock} submitLabel="רישום ההתאמה" pendingLabel="רושם…" className="grid gap-4 sm:grid-cols-2">
+          <ActionForm action={adjustStock} submitLabel="רישום ההתאמה" pendingLabel="רושם…" submitClassName="btn sm:col-span-2 sm:justify-self-start" className="grid gap-4 sm:grid-cols-2">
             <input type="hidden" name="variant_id" value={variant.id} />
             <input type="hidden" name="document_id" value={documentId ?? ""} />
             {/* New on every render, so one filled form is applied at most once. */}
@@ -88,7 +103,7 @@ export default async function AdjustStockPage({ searchParams }: PageProps<"/stoc
             </div>
             <div>
               <label className="label" htmlFor="quantity">כמות</label>
-              <input className="field" id="quantity" name="quantity" dir="ltr" inputMode="decimal" required />
+              <input className="field tabular-nums" id="quantity" name="quantity" dir="ltr" inputMode="decimal" required />
             </div>
             <div className="sm:col-span-2">
               <label className="label" htmlFor="reason">סיבה</label>

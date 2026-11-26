@@ -1,10 +1,20 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import {
+  AlertTriangle,
+  ArrowRight,
+  CheckCircle2,
+  ClipboardCheck,
+  ExternalLink,
+  FileText,
+  Warehouse,
+} from "lucide-react";
 import { requireBusiness } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { can } from "@/lib/permissions";
 import {
+  DOCUMENT_STATUS_LABELS,
   DOCUMENT_TYPE_LABELS,
   DOCUMENT_TYPES,
   DOCUMENTS_BUCKET,
@@ -22,6 +32,14 @@ export const metadata: Metadata = { title: "קליטה" };
 // Printed totals rarely add up to the agora (see SPEC 13.1), so allow half a shekel.
 const MONEY_TOLERANCE = 0.5;
 const toInput = (value: number | null) => (value === null ? "" : String(value));
+
+const STATUS_BADGES = {
+  uploaded: "bg-surface-subtle text-muted",
+  extracting: "bg-surface-subtle text-muted",
+  review: "bg-warning-soft text-warning",
+  failed: "bg-danger-soft text-danger",
+  approved: "bg-accent-soft text-accent-strong",
+} as const;
 
 export default async function DocumentPage({ params }: PageProps<"/receiving/[id]">) {
   const { id } = await params;
@@ -66,32 +84,54 @@ export default async function DocumentPage({ params }: PageProps<"/receiving/[id
 
   const header = (
     <div>
-      <Link href="/receiving" className="text-sm text-muted underline-offset-4 hover:underline">
-        → כל הקליטות
+      <Link href="/receiving" className="back-link">
+        <ArrowRight className="size-4" aria-hidden />
+        <span>כל הקליטות</span>
       </Link>
-      <h1 className="mt-1 text-2xl font-bold">{title}</h1>
-      <p className="mt-1 text-sm text-muted">נקלט אל: {document.warehouses.name}</p>
+      <div className="mt-2 flex flex-wrap items-center gap-3">
+        <h1 className="text-2xl font-extrabold tracking-tight">{title}</h1>
+        <span className={`badge ${STATUS_BADGES[document.status]}`}>
+          {DOCUMENT_STATUS_LABELS[document.status]}
+        </span>
+      </div>
+      <p className="mt-1.5 inline-flex items-center gap-1.5 text-sm text-muted">
+        <Warehouse className="size-4 text-accent" aria-hidden />
+        <span>נקלט אל: <strong className="font-semibold text-ink">{document.warehouses.name}</strong></span>
+      </p>
     </div>
   );
 
   const viewer = (
-    <details className="card" open>
-      <summary className="cursor-pointer font-semibold">המסמך המקורי ({files.length})</summary>
-      <div className="mt-4 flex flex-col gap-4">
+    <details className="card group" open>
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 font-bold text-ink">
+        <span className="section-heading">
+          <FileText className="size-4.5 text-accent" aria-hidden />
+          <span>המסמך המקורי ({files.length})</span>
+        </span>
+        <span className="text-xs font-medium text-muted group-open:hidden">הצגה</span>
+        <span className="hidden text-xs font-medium text-muted group-open:inline">הסתרה</span>
+      </summary>
+      <div className="mt-4 flex flex-col gap-4 border-t border-line pt-4">
         {files.map((file) =>
           !file.url ? (
             <p key={file.id} className="text-sm text-danger">לא הצלחנו לטעון את הקובץ {file.original_name}.</p>
           ) : file.mime_type === "application/pdf" ? (
             <div key={file.id}>
-              <a href={file.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-accent underline underline-offset-4">
-                פתיחת ה-PDF בחלון חדש
+              <a
+                href={file.url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 text-sm font-semibold text-accent hover:underline"
+              >
+                <ExternalLink className="size-4" aria-hidden />
+                <span>פתיחת ה-PDF בחלון חדש</span>
               </a>
-              <iframe src={file.url} title={file.original_name ?? "PDF"} className="mt-2 hidden h-[70vh] w-full rounded-lg border border-line sm:block" />
+              <iframe src={file.url} title={file.original_name ?? "PDF"} className="mt-3 hidden h-[70vh] w-full rounded-xl border border-line bg-surface-subtle sm:block" />
             </div>
           ) : (
-            <a key={file.id} href={file.url} target="_blank" rel="noreferrer">
+            <a key={file.id} href={file.url} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-xl border border-line bg-surface-subtle/50">
               {/* eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL from private storage */}
-              <img src={file.url} alt={`עמוד ${file.position} של המסמך`} className="max-h-[80vh] w-full rounded-lg border border-line object-contain" />
+              <img src={file.url} alt={`עמוד ${file.position} של המסמך`} className="max-h-[80vh] w-full object-contain" />
             </a>
           ),
         )}
@@ -100,12 +140,15 @@ export default async function DocumentPage({ params }: PageProps<"/receiving/[id
   );
 
   const removal = can(active.role, "catalog.delete") && (
-    <section className="card border-danger/30">
-      <h2 className="font-semibold">מחיקת המסמך</h2>
-      <p className="mt-1 mb-4 text-sm text-muted">
+    <section className="card border-danger/30 bg-danger-soft/30">
+      <h2 className="section-heading text-danger">
+        <AlertTriangle className="size-4.5" aria-hidden />
+        <span>מחיקת המסמך</span>
+      </h2>
+      <p className="mt-1.5 mb-4 text-sm text-muted">
         המסמך, הקבצים והשורות שלו יימחקו. המלאי לא מושפע. אי אפשר לבטל את הפעולה.
       </p>
-      <ActionForm action={deleteDocument} submitLabel="מחיקת המסמך לצמיתות" pendingLabel="מוחק…" submitClassName="btn-quiet text-danger">
+      <ActionForm action={deleteDocument} submitLabel="מחיקת המסמך לצמיתות" pendingLabel="מוחק…" submitClassName="btn-danger">
         <input type="hidden" name="id" value={document.id} />
       </ActionForm>
     </section>
@@ -125,9 +168,12 @@ export default async function DocumentPage({ params }: PageProps<"/receiving/[id
     return (
       <div className="flex flex-col gap-6">
         {header}
-        <section className="card border-danger/30" role="alert">
-          <h2 className="font-semibold text-danger">לא הצלחנו לקרוא את המסמך</h2>
-          <p className="mt-2 text-sm">{document.extraction_error}</p>
+        <section className="card border-danger/35 bg-danger-soft/40" role="alert">
+          <h2 className="section-heading text-danger">
+            <AlertTriangle className="size-4.5" aria-hidden />
+            <span>לא הצלחנו לקרוא את המסמך</span>
+          </h2>
+          <p className="mt-2 text-sm text-ink">{document.extraction_error}</p>
           <p className="mt-1 text-sm text-muted">שום דבר לא נשמר למלאי. הקובץ המקורי שמור.</p>
           <div className="mt-4 flex flex-wrap items-start gap-3">
             <RetryExtraction documentId={document.id} />
@@ -276,16 +322,26 @@ export default async function DocumentPage({ params }: PageProps<"/receiving/[id
       {header}
 
       {duplicateId && (
-        <p className="rounded-lg bg-danger-soft px-4 py-3 text-sm text-danger" role="alert">
-          נראה שהמסמך הזה כבר הועלה בעבר.{" "}
-          <Link href={`/receiving/${duplicateId}`} className="font-semibold underline underline-offset-4">
-            פתיחת ההעלאה הקודמת
-          </Link>
-        </p>
+        <div className="flex items-start gap-3 rounded-2xl border border-danger/35 bg-danger-soft px-4 py-3.5 text-sm text-danger" role="alert">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
+          <p>
+            נראה שהמסמך הזה כבר הועלה בעבר.{" "}
+            <Link href={`/receiving/${duplicateId}`} className="font-semibold underline underline-offset-4">
+              פתיחת ההעלאה הקודמת
+            </Link>
+          </p>
+        </div>
       )}
 
       <section className="card">
-        <h2 className="font-semibold">מה לבדוק</h2>
+        <h2 className="section-heading">
+          {warnings.length === 0 && flagged === 0 ? (
+            <CheckCircle2 className="size-4.5 text-accent" aria-hidden />
+          ) : (
+            <AlertTriangle className="size-4.5 text-warning" aria-hidden />
+          )}
+          <span>מה לבדוק</span>
+        </h2>
         {warnings.length === 0 && flagged === 0 ? (
           <p className="mt-2 text-sm text-muted">
             {lines.length === 0
@@ -293,7 +349,7 @@ export default async function DocumentPage({ params }: PageProps<"/receiving/[id
               : "הכמויות והסכומים מתיישבים עם מה שמודפס במסמך. כדאי בכל זאת לעבור על השורות מול המקור."}
           </p>
         ) : (
-          <ul className="mt-2 flex list-disc flex-col gap-1 ps-5 text-sm">
+          <ul className="mt-3 flex list-disc flex-col gap-1.5 rounded-xl border border-warning-border/40 bg-warning-soft/60 py-3 pe-4 ps-8 text-sm text-warning">
             {warnings.map((warning) => (
               <li key={warning}>{warning}</li>
             ))}
@@ -301,7 +357,7 @@ export default async function DocumentPage({ params }: PageProps<"/receiving/[id
           </ul>
         )}
         {lines.length > 0 && (
-          <p className="mt-2 text-sm text-muted">
+          <p className="mt-3 text-sm text-muted">
             {unmatched === 0
               ? "כל השורות זוהו בקטלוג."
               : `${unmatched} מתוך ${lines.length} שורות עוד לא קיימות בקטלוג.`}
@@ -312,11 +368,14 @@ export default async function DocumentPage({ params }: PageProps<"/receiving/[id
             הערת הקריאה: {document.extraction_notes}
           </p>
         )}
-        <p className="mt-3 text-sm text-muted">המלאי יתעדכן רק אחרי אישור הקליטה, בתחתית העמוד.</p>
+        <p className="mt-2 text-xs text-muted">המלאי יתעדכן רק אחרי אישור הקליטה, בתחתית העמוד.</p>
       </section>
 
       <section className="card">
-        <h2 className="mb-4 font-semibold">פרטי המסמך</h2>
+        <h2 className="section-heading mb-4">
+          <ClipboardCheck className="size-4.5 text-accent" aria-hidden />
+          <span>פרטי המסמך</span>
+        </h2>
         <ActionForm action={updateDocumentHeader} submitLabel="שמירת הפרטים" submitClassName="btn-quiet sm:self-start" className="flex flex-col gap-4">
           <input type="hidden" name="id" value={document.id} />
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -344,7 +403,7 @@ export default async function DocumentPage({ params }: PageProps<"/receiving/[id
             </div>
             <div>
               <label className="label" htmlFor="doc_number">מספר מסמך</label>
-              <input className="field" id="doc_number" name="doc_number" dir="ltr" defaultValue={document.doc_number ?? ""} />
+              <input className="field font-mono text-sm" id="doc_number" name="doc_number" dir="ltr" defaultValue={document.doc_number ?? ""} />
             </div>
             <div>
               <label className="label" htmlFor="doc_date">תאריך</label>
@@ -352,13 +411,13 @@ export default async function DocumentPage({ params }: PageProps<"/receiving/[id
             </div>
           </div>
           {!document.supplier_id && document.supplier_name_raw && (
-            <p className="text-sm text-muted">
+            <p className="rounded-xl bg-surface-subtle/70 px-3.5 py-2.5 text-sm text-muted">
               במסמך מופיע הספק ״{document.supplier_name_raw}״
               {document.supplier_tax_id_raw && (
                 <> (ח.פ. <bdi dir="ltr">{document.supplier_tax_id_raw}</bdi>)</>
               )}
               , והוא לא נמצא ברשימת הספקים.{" "}
-              <Link href="/suppliers" className="font-medium text-accent underline underline-offset-4">
+              <Link href="/suppliers" className="font-semibold text-accent underline underline-offset-4">
                 הוספת ספק
               </Link>
             </p>

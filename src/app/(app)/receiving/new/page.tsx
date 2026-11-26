@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import { requireBusiness } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { UploadForm } from "@/components/upload-form";
@@ -21,10 +22,12 @@ export default async function NewReceivingPage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <Link href="/receiving" className="text-sm text-muted underline-offset-4 hover:underline">
-          → כל הקליטות
+        <Link href="/receiving" className="back-link">
+          <ArrowRight className="size-4" aria-hidden />
+          <span>כל הקליטות</span>
         </Link>
-        <h1 className="mt-1 text-2xl font-bold">קליטה חדשה</h1>
+        <h1 className="mt-2 text-2xl font-extrabold tracking-tight">קליטה חדשה</h1>
+        <p className="mt-0.5 text-sm text-muted">בחרו מחסן והעלו צילום או PDF של החשבונית / תעודת המשלוח</p>
       </div>
       <UploadForm businessId={active.businessId} warehouses={warehouses} />
     </div>

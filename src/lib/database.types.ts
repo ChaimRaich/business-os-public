@@ -51,17 +51,124 @@ isOneToOne: false
                   ]
                 },"businesses": {
                   Row: {
-                    "created_at": string,"created_by": string | null,"id": string,"name": string
+                    "created_at": string,"created_by": string | null,"id": string,"name": string,"onboarding_completed_at": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "created_at"?: string,"created_by"?: string | null,"id"?: string,"name": string
+                    "created_at"?: string,"created_by"?: string | null,"id"?: string,"name": string,"onboarding_completed_at"?: string | null
                   }
                   Update: {
-                    "created_at"?: string,"created_by"?: string | null,"id"?: string,"name"?: string
+                    "created_at"?: string,"created_by"?: string | null,"id"?: string,"name"?: string,"onboarding_completed_at"?: string | null
                   }
                   Relationships: [
                     
+                  ]
+                },"business_integrations": {
+                  Row: {
+                    "account_ref": string | null,"business_id": string,"category": Database["public"]["Enums"]["integration_category"],"config": Json,"created_at": string,"credential_hint": string | null,"display_name": string,"id": string,"last_error": string | null,"last_synced_at": string | null,"mode": string,"provider": string,"status": Database["public"]["Enums"]["integration_status"],"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "account_ref"?: string | null,"business_id": string,"category": Database["public"]["Enums"]["integration_category"],"config"?: Json,"created_at"?: string,"credential_hint"?: string | null,"display_name": string,"id"?: string,"last_error"?: string | null,"last_synced_at"?: string | null,"mode"?: string,"provider": string,"status"?: Database["public"]["Enums"]["integration_status"],"updated_at"?: string
+                  }
+                  Update: {
+                    "account_ref"?: string | null,"business_id"?: string,"category"?: Database["public"]["Enums"]["integration_category"],"config"?: Json,"created_at"?: string,"credential_hint"?: string | null,"display_name"?: string,"id"?: string,"last_error"?: string | null,"last_synced_at"?: string | null,"mode"?: string,"provider"?: string,"status"?: Database["public"]["Enums"]["integration_status"],"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+                      foreignKeyName: "business_integrations_business_id_fkey"
+                      columns: ["business_id"]
+                      isOneToOne: false
+                      referencedRelation: "businesses"
+                      referencedColumns: ["id"]
+                    }
+                  ]
+                },"campaigns": {
+                  Row: {
+                    "budget": number,"business_id": string,"channel": Database["public"]["Enums"]["campaign_channel"],"conversions_count": number,"created_at": string,"end_date": string | null,"id": string,"leads_count": number,"name": string,"notes": string | null,"revenue": number,"spent": number,"start_date": string | null,"status": Database["public"]["Enums"]["campaign_status"],"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "budget"?: number,"business_id": string,"channel": Database["public"]["Enums"]["campaign_channel"],"conversions_count"?: number,"created_at"?: string,"end_date"?: string | null,"id"?: string,"leads_count"?: number,"name": string,"notes"?: string | null,"revenue"?: number,"spent"?: number,"start_date"?: string | null,"status"?: Database["public"]["Enums"]["campaign_status"],"updated_at"?: string
+                  }
+                  Update: {
+                    "budget"?: number,"business_id"?: string,"channel"?: Database["public"]["Enums"]["campaign_channel"],"conversions_count"?: number,"created_at"?: string,"end_date"?: string | null,"id"?: string,"leads_count"?: number,"name"?: string,"notes"?: string | null,"revenue"?: number,"spent"?: number,"start_date"?: string | null,"status"?: Database["public"]["Enums"]["campaign_status"],"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+                      foreignKeyName: "campaigns_business_id_fkey"
+                      columns: ["business_id"]
+                      isOneToOne: false
+                      referencedRelation: "businesses"
+                      referencedColumns: ["id"]
+                    }
+                  ]
+                },"customers": {
+                  Row: {
+                    "business_id": string,"created_at": string,"email": string | null,"id": string,"lifetime_value": number,"name": string,"notes": string | null,"phone": string | null,"source": string | null,"stage": Database["public"]["Enums"]["customer_stage"],"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"created_at"?: string,"email"?: string | null,"id"?: string,"lifetime_value"?: number,"name": string,"notes"?: string | null,"phone"?: string | null,"source"?: string | null,"stage"?: Database["public"]["Enums"]["customer_stage"],"updated_at"?: string
+                  }
+                  Update: {
+                    "business_id"?: string,"created_at"?: string,"email"?: string | null,"id"?: string,"lifetime_value"?: number,"name"?: string,"notes"?: string | null,"phone"?: string | null,"source"?: string | null,"stage"?: Database["public"]["Enums"]["customer_stage"],"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+                      foreignKeyName: "customers_business_id_fkey"
+                      columns: ["business_id"]
+                      isOneToOne: false
+                      referencedRelation: "businesses"
+                      referencedColumns: ["id"]
+                    }
+                  ]
+                },"finance_accounts": {
+                  Row: {
+                    "account_number_last4": string | null,"account_type": string,"balance": number,"business_id": string,"created_at": string,"currency": string,"id": string,"institution": string | null,"name": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "account_number_last4"?: string | null,"account_type": string,"balance"?: number,"business_id": string,"created_at"?: string,"currency"?: string,"id"?: string,"institution"?: string | null,"name": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "account_number_last4"?: string | null,"account_type"?: string,"balance"?: number,"business_id"?: string,"created_at"?: string,"currency"?: string,"id"?: string,"institution"?: string | null,"name"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+                      foreignKeyName: "finance_accounts_business_id_fkey"
+                      columns: ["business_id"]
+                      isOneToOne: false
+                      referencedRelation: "businesses"
+                      referencedColumns: ["id"]
+                    }
+                  ]
+                },"ledger_entries": {
+                  Row: {
+                    "account_id": string | null,"amount": number,"business_id": string,"counterparty": string | null,"created_at": string,"due_date": string | null,"entry_date": string,"id": string,"kind": Database["public"]["Enums"]["ledger_entry_kind"],"notes": string | null,"reference_number": string | null,"status": Database["public"]["Enums"]["ledger_entry_status"],"title": string,"updated_at": string,"vat_amount": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "account_id"?: string | null,"amount": number,"business_id": string,"counterparty"?: string | null,"created_at"?: string,"due_date"?: string | null,"entry_date"?: string,"id"?: string,"kind": Database["public"]["Enums"]["ledger_entry_kind"],"notes"?: string | null,"reference_number"?: string | null,"status"?: Database["public"]["Enums"]["ledger_entry_status"],"title": string,"updated_at"?: string,"vat_amount"?: number
+                  }
+                  Update: {
+                    "account_id"?: string | null,"amount"?: number,"business_id"?: string,"counterparty"?: string | null,"created_at"?: string,"due_date"?: string | null,"entry_date"?: string,"id"?: string,"kind"?: Database["public"]["Enums"]["ledger_entry_kind"],"notes"?: string | null,"reference_number"?: string | null,"status"?: Database["public"]["Enums"]["ledger_entry_status"],"title"?: string,"updated_at"?: string,"vat_amount"?: number
+                  }
+                  Relationships: [
+                    {
+                      foreignKeyName: "ledger_entries_business_id_fkey"
+                      columns: ["business_id"]
+                      isOneToOne: false
+                      referencedRelation: "businesses"
+                      referencedColumns: ["id"]
+                    },
+                    {
+                      foreignKeyName: "ledger_entries_account_id_business_id_fkey"
+                      columns: ["account_id","business_id"]
+                      isOneToOne: false
+                      referencedRelation: "finance_accounts"
+                      referencedColumns: ["id","business_id"]
+                    }
                   ]
                 },"document_files": {
                   Row: {
@@ -341,6 +448,9 @@ isOneToOne: false
 "approve_document":
 { Args: { "p_document_id": string }; Returns: boolean
                            },
+"complete_business_onboarding":
+{ Args: { "p_business_id": string }; Returns: string
+                           },
 "assign_internal_barcodes":
 { Args: { "p_document_id": string }; Returns: undefined
                            },
@@ -388,7 +498,7 @@ isOneToOne: false
                            }
           }
           Enums: {
-            "code_kind": "barcode"|"supplier_sku"|"pos"|"web","document_status": "uploaded"|"extracting"|"review"|"failed"|"approved","document_type": "delivery_note"|"tax_invoice"|"tax_invoice_receipt"|"other","material": "silver"|"gold","member_role": "owner"|"manager"|"staff","movement_kind": "receipt"|"adjustment","product_type": "ring"|"earring"|"necklace"|"bracelet"
+            "campaign_channel": "meta_ads"|"google_ads"|"whatsapp"|"email"|"sms","campaign_status": "draft"|"active"|"paused"|"completed","code_kind": "barcode"|"supplier_sku"|"pos"|"web","customer_stage": "lead"|"prospect"|"active"|"vip"|"inactive","document_status": "uploaded"|"extracting"|"review"|"failed"|"approved","document_type": "delivery_note"|"tax_invoice"|"tax_invoice_receipt"|"other","integration_category": "pos_commerce"|"accounting"|"payments"|"marketing_crm","integration_status": "disconnected"|"sandbox"|"connected"|"error","ledger_entry_kind": "income"|"expense"|"invoice"|"tax_payment","ledger_entry_status": "draft"|"pending"|"paid"|"overdue","material": "silver"|"gold","member_role": "owner"|"manager"|"staff","movement_kind": "receipt"|"adjustment","product_type": "ring"|"earring"|"necklace"|"bracelet"
           }
           CompositeTypes: {
             [_ in never]: never

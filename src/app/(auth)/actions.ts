@@ -9,6 +9,17 @@ function text(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
 }
 
+function isConnectionError(error: { name?: string; status?: number; message?: string }) {
+  return (
+    error.name === "AuthRetryableFetchError" ||
+    error.status === 0 ||
+    /fetch failed|ECONNREFUSED|Failed to fetch/i.test(error.message ?? "")
+  );
+}
+
+const NO_SUPABASE_ERROR =
+  "אין חיבור ל-Supabase (127.0.0.1:54321). הפעילו npx supabase start (עם Docker) או חברו פרויקט Supabase בענן ב-.env.local.";
+
 export async function login(_: FormState, formData: FormData): Promise<FormState> {
   const email = text(formData, "email");
   const password = String(formData.get("password") ?? "");
@@ -17,8 +28,16 @@ export async function login(_: FormState, formData: FormData): Promise<FormState
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  let error: { code?: string; name?: string; status?: number; message?: string } | null = null;
+  try {
+    ({ error } = await supabase.auth.signInWithPassword({ email, password }));
+  } catch {
+    return { error: NO_SUPABASE_ERROR };
+  }
   if (error) {
+    if (isConnectionError(error)) {
+      return { error: NO_SUPABASE_ERROR };
+    }
     return {
       error:
         error.code === "invalid_credentials"
@@ -43,12 +62,21 @@ export async function signup(_: FormState, formData: FormData): Promise<FormStat
   }
 
   const supabase = await createClient();
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: { data: { full_name: fullName } },
-  });
+  let data: { session: unknown } | null = null;
+  let error: { code?: string; name?: string; status?: number; message?: string } | null = null;
+  try {
+    ({ data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { full_name: fullName } },
+    }));
+  } catch {
+    return { error: NO_SUPABASE_ERROR };
+  }
   if (error) {
+    if (isConnectionError(error)) {
+      return { error: NO_SUPABASE_ERROR };
+    }
     return {
       error:
         error.code === "user_already_exists"
@@ -58,7 +86,7 @@ export async function signup(_: FormState, formData: FormData): Promise<FormStat
             : "ההרשמה נכשלה. נסו שוב בעוד רגע.",
     };
   }
-  if (!data.session) {
+  if (!data?.session) {
     return { ok: "שלחנו אליכם אימייל לאישור החשבון. אחרי האישור אפשר להתחבר." };
   }
   // The browser may hold pages (and redirects) cached for the previous session.

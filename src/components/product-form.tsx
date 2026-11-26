@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { AlertCircle, Barcode, Loader2, Package, Plus, Trash2 } from "lucide-react";
 import type { FormAction } from "@/components/action-form";
 
 type Row = {
@@ -52,39 +53,48 @@ export function ProductForm({
         )}
       />
 
-      <section className="card grid gap-4 sm:grid-cols-2">
-        <div className="sm:col-span-2">
-          <label className="label" htmlFor="product-name">שם המוצר</label>
-          <input className="field" id="product-name" name="name" maxLength={200} required placeholder="טבעת כסף CAG020-1" />
-        </div>
-        <div>
-          <label className="label" htmlFor="product-supplier">ספק</label>
-          <select className="field min-h-11" id="product-supplier" name="supplier_id" defaultValue="">
-            <option value="">ללא ספק</option>
-            {suppliers.map((supplier) => (
-              <option key={supplier.id} value={supplier.id}>
-                {supplier.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="label" htmlFor="product-notes">הערות</label>
-          <input className="field" id="product-notes" name="notes" />
+      <section className="card">
+        <h2 className="section-heading mb-4">
+          <Package className="size-4.5 text-accent" aria-hidden />
+          <span>פרטי הדגם</span>
+        </h2>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <label className="label" htmlFor="product-name">שם המוצר</label>
+            <input className="field" id="product-name" name="name" maxLength={200} required placeholder="טבעת כסף CAG020-1" />
+          </div>
+          <div>
+            <label className="label" htmlFor="product-supplier">ספק</label>
+            <select className="field min-h-11" id="product-supplier" name="supplier_id" defaultValue="">
+              <option value="">ללא ספק</option>
+              {suppliers.map((supplier) => (
+                <option key={supplier.id} value={supplier.id}>
+                  {supplier.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="label" htmlFor="product-notes">הערות</label>
+            <input className="field" id="product-notes" name="notes" />
+          </div>
         </div>
       </section>
 
       <section className="card">
-        <h2 className="font-semibold">מק״טים</h2>
-        <p className="mt-1 mb-4 text-sm text-muted">
+        <h2 className="section-heading">
+          <Barcode className="size-4.5 text-accent" aria-hidden />
+          <span>מק״טים ווריאציות</span>
+        </h2>
+        <p className="mt-1.5 mb-5 text-sm text-muted">
           הקלידו כל קוד בדיוק כפי שהוא מודפס, כולל אפסים בהתחלה. שדה שאין לכם משאירים ריק.
           {hasVariants && " מק״ט ספק יכול לחזור בכמה וריאציות; ברקוד ומק״ט קופה לא."}
         </p>
 
         <div className="flex flex-col gap-4">
           {rows.map((row, index) => (
-            <fieldset key={row.key} className="rounded-lg border border-line p-3 sm:p-4">
-              <legend className="px-1 text-sm font-medium text-muted">
+            <fieldset key={row.key} className="rounded-xl border border-line bg-surface-subtle/40 p-4">
+              <legend className="rounded-md bg-surface px-2 py-0.5 text-xs font-semibold text-muted">
                 {hasVariants ? `וריאציה ${index + 1}` : "פריט יחיד"}
               </legend>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
@@ -105,7 +115,7 @@ export function ProductForm({
                   <div key={field.name}>
                     <label className="label" htmlFor={`${field.name}-${row.key}`}>{field.label}</label>
                     <input
-                      className="field"
+                      className="field font-mono text-sm"
                       id={`${field.name}-${row.key}`}
                       dir="ltr"
                       autoComplete="off"
@@ -121,10 +131,11 @@ export function ProductForm({
               {hasVariants && (
                 <button
                   type="button"
-                  className="mt-3 min-h-11 text-sm text-danger underline-offset-4 hover:underline"
+                  className="mt-3 inline-flex min-h-10 cursor-pointer items-center gap-1.5 text-sm font-medium text-danger hover:underline"
                   onClick={() => setRows((current) => current.filter((r) => r.key !== row.key))}
                 >
-                  הסרת וריאציה {index + 1}
+                  <Trash2 className="size-3.5" aria-hidden />
+                  <span>הסרת וריאציה {index + 1}</span>
                 </button>
               )}
             </fieldset>
@@ -141,17 +152,24 @@ export function ProductForm({
             setNextKey((key) => key + 1);
           }}
         >
-          {hasVariants ? "וריאציה נוספת" : "למוצר יש מידות או צבעים? הוספת וריאציה"}
+          <Plus className="size-4" aria-hidden />
+          <span>{hasVariants ? "וריאציה נוספת" : "למוצר יש מידות או צבעים? הוספת וריאציה"}</span>
         </button>
       </section>
 
       <div className="flex flex-wrap items-center gap-3">
         <button type="submit" className="btn" disabled={pending}>
-          {pending ? "שומר…" : "שמירת המוצר"}
+          {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
+          <span>{pending ? "שומר…" : "שמירת המוצר"}</span>
         </button>
-        <p aria-live="polite" className="text-sm text-danger empty:hidden">
-          {state?.error}
-        </p>
+        <div aria-live="polite" className="empty:hidden">
+          {state?.error && (
+            <p className="inline-flex items-center gap-2 rounded-xl border border-danger/25 bg-danger-soft px-3 py-2 text-sm font-medium text-danger">
+              <AlertCircle className="size-4 shrink-0" aria-hidden />
+              <span>{state.error}</span>
+            </p>
+          )}
+        </div>
       </div>
     </form>
   );

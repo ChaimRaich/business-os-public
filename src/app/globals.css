@@ -333,6 +333,13 @@ h2,
   text-wrap: balance;
 }
 
+/* The entry hero shares its row with the form card, so its title runs a size smaller there. */
+@media (min-width: 1024px) {
+  .entry-title {
+    font-size: clamp(2.5rem, 4.4vw, 3.5rem);
+  }
+}
+
 .section-title {
   font-size: clamp(1.75rem, 3.6vw, 2.75rem);
   letter-spacing: -0.025em;

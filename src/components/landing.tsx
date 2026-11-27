@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 import Link from "next/link";
-import { Showcase, Story, TiltScene, type ShowcaseTab } from "@/components/motion";
+import { Showcase, type ShowcaseTab } from "@/components/motion";
 
 const vars = (values: Record<string, string | number>) => values as CSSProperties;
 
@@ -130,6 +130,54 @@ function ExportDemo() {
   );
 }
 
+/** What the home screen looks like on a working morning. */
+const MORNING = [
+  { glyph: "↓", tone: "var(--tone-a)", title: "הכנתי הזמנה לספק לדוגמה", reason: "6 פריטים ירדו מתחת לסף, מתוכם 2 אזלו.", action: "לבדיקה ולשליחה" },
+  { glyph: "✦", tone: "var(--tone-b)", title: "הכנתי מבצע למלאי שלא זז", reason: "4 מוצרים במלאי לא נמכרו 30 יום.", action: "לפתיחת הקמפיין" },
+  { glyph: "₪", tone: "var(--tone-c)", title: "החומר של אוקטובר מוכן לרואה החשבון", reason: "החודש נסגר. 23 מסמכים רוכזו לקובץ אחד.", action: "להורדת הקובץ" },
+];
+
+function MorningDemo() {
+  return (
+    <div className="stage relative p-4 pb-20 sm:p-8 sm:pb-20" aria-hidden="true">
+      <div className="mock mx-auto max-w-2xl overflow-hidden">
+        <div className="border-b border-line px-5 py-4">
+          <p className="text-xs text-muted">יום ראשון, 8:02</p>
+          <p className="display mt-1 text-xl sm:text-2xl">3 דברים מחכים לכם היום.</p>
+        </div>
+        <ul className="divide-y divide-line">
+          {MORNING.map((item, index) => (
+            <li key={item.title} className="demo-row flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-4" style={vars({ "--i": index })}>
+              <span className="glyph size-9! rounded-[9px]! text-base!" style={vars({ "--glyph": item.tone })}>{item.glyph}</span>
+              <span className="min-w-40 flex-1 text-start">
+                <span className="block text-sm font-medium">{item.title}</span>
+                <span className="mt-0.5 block text-xs leading-relaxed text-muted">{item.reason}</span>
+              </span>
+              <span className="chip">{item.action}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <Toast>ההזמנה אושרה · נפתחת בוואטסאפ</Toast>
+    </div>
+  );
+}
+
+const HOW_STEPS = [
+  {
+    title: "מצלמים את תעודת המשלוח",
+    body: "המערכת קוראת את השורות, מתאימה אותן לקטלוג ומסמנת מה שלא זוהה. המלאי מתעדכן רק אחרי שאישרתם.",
+  },
+  {
+    title: "מייבאים את המכירות מהקופה",
+    body: "מה שנמכר יורד מהמלאי. מכאן המערכת יודעת מה זז, מה עומד על המדף ומה עומד להיגמר.",
+  },
+  {
+    title: "מאשרים את מה שהיא הכינה",
+    body: "ההזמנה לספק, המבצע והחומר לרואה החשבון מחכים בדף הבית, מוכנים. אתם בודקים ומאשרים.",
+  },
+];
+
 const TABS: ShowcaseTab[] = [
   { id: "receiving", label: "קליטה", glyph: "↓", tone: "var(--tone-a)" },
   { id: "catalog", label: "קטלוג", glyph: "≡", tone: "var(--tone-b)" },
@@ -188,7 +236,7 @@ const FEATURES = [
   },
 ];
 
-/** What the system starts on its own. The last three are planned and not built yet. */
+/** What the system starts on its own. The first three work today and are shown in the morning demo; the last three are planned and not built yet. */
 const INITIATIVES = [
   {
     glyph: "↓",
@@ -255,61 +303,13 @@ const FAQ = [
   },
 ];
 
-function Tone({ tone, glyph, children }: { tone: string; glyph: string; children: ReactNode }) {
-  return (
-    <span className="tone" style={vars({ "--tone": tone })}>
-      <span className="glyph" aria-hidden="true">{glyph}</span>
-      {children}
-    </span>
-  );
-}
-
-type Part = string | ReactNode;
-
-/** Paragraphs whose words light up as they are scrolled through. A string ending in "~" joins the next part without a space. */
-function Reading({ paragraphs }: { paragraphs: Part[][] }) {
-  let word = 0;
-  const rendered = paragraphs.map((parts, index) => (
-    <p key={index}>
-      {parts.flatMap((part, partIndex) => {
-        if (typeof part !== "string") {
-          return [
-            <span key={`${partIndex}`} className="word" style={vars({ "--w": word++ })}>
-              {part}{" "}
-            </span>,
-          ];
-        }
-        const glued = part.endsWith("~");
-        const words = (glued ? part.slice(0, -1) : part).split(" ").filter(Boolean);
-        return words.map((text, wordIndex) => (
-          <span key={`${partIndex}-${wordIndex}`} className="word" style={vars({ "--w": word++ })}>
-            {text}
-            {glued && wordIndex === words.length - 1 ? "" : " "}
-          </span>
-        ));
-      })}
-    </p>
-  ));
-  return (
-    <div className="reading mx-auto flex max-w-2xl flex-col gap-6 text-xl leading-loose sm:text-2xl sm:leading-loose" data-fx suppressHydrationWarning style={vars({ "--n": word })}>
-      {rendered}
-    </div>
-  );
-}
-
-const STORY_STEPS = [
-  { title: "המסמך", body: "הצילום או ה-PDF שהגיע מהספק, בדיוק כפי שהתקבל. הוא נשמר ליד הקליטה ואפשר לחזור אליו תמיד." },
-  { title: "הקטלוג", body: "כל שורה מותאמת למוצר ולווריאציה. מה שלא נמצא — מסומן, ולא נכנס למלאי בלי שראיתם אותו." },
-  { title: "המלאי", body: "אישור הקליטה מוסיף את הכמויות למחסן שבחרתם. מכאן יוצא גם הקובץ לקופה." },
-];
-
 /** The long-form story under the hero. `cta` is where the closing button leads. */
 export function LandingSections({ cta }: { cta: { href: string; label: string } }) {
   return (
     <>
       <section className="section" id="initiative" data-nav="יוזמות" aria-labelledby="initiative-heading">
-        <div className="max-w-2xl">
-          <p className="eyebrow reveal" suppressHydrationWarning>עסק שמפעיל את עצמו</p>
+        <div className="mx-auto max-w-2xl text-center">
+          <p className="eyebrow reveal" suppressHydrationWarning>זה מה שמחכה לכם בכניסה</p>
           <h2 id="initiative-heading" className="section-title reveal mt-3" suppressHydrationWarning style={vars({ "--d": 1 })}>
             המערכת יוזמת. אתם מאשרים.
           </h2>
@@ -317,9 +317,13 @@ export function LandingSections({ cta }: { cta: { href: string; label: string } 
             רוב המערכות מחכות שתיזכרו. Business OS עוקב אחרי המלאי, המכירות והלוח, ומכין את הצעד הבא לפני שביקשתם.
           </p>
         </div>
-        <div className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {INITIATIVES.map((item, index) => (
-            <article key={item.title} className="card lift spot reveal" suppressHydrationWarning style={vars({ "--d": index % 3 })}>
+        <div className="fx-tilt mx-auto mt-10 max-w-4xl" data-fx suppressHydrationWarning>
+          <MorningDemo />
+          <p className="mt-3 text-center text-xs text-muted">ההדגמה להמחשה בלבד; הפריטים והמספרים אינם אמיתיים.</p>
+        </div>
+        <div className="mt-10 grid gap-3 sm:grid-cols-3">
+          {INITIATIVES.slice(3).map((item, index) => (
+            <article key={item.title} className="card lift spot reveal" suppressHydrationWarning style={vars({ "--d": index })}>
               <span className="glyph size-9! rounded-[9px]! text-base!" style={vars({ "--glyph": item.tone })} aria-hidden="true">
                 {item.glyph}
               </span>
@@ -330,12 +334,23 @@ export function LandingSections({ cta }: { cta: { href: string; label: string } 
         </div>
       </section>
 
-      <section className="section" id="showcase" data-nav="הדגמה" aria-labelledby="showcase-heading">
-        <div className="reveal mx-auto max-w-2xl text-center" suppressHydrationWarning>
-          <p className="eyebrow">וזה מתחיל בקליטת הסחורה</p>
-          <h2 id="showcase-heading" className="section-title mt-3">מהתעודה למדף, מול העיניים</h2>
+      <section className="section" id="how" data-nav="איך זה עובד" aria-labelledby="how-heading">
+        <div className="max-w-2xl">
+          <p className="eyebrow reveal" suppressHydrationWarning>איך זה עובד</p>
+          <h2 id="how-heading" className="section-title reveal mt-3" suppressHydrationWarning style={vars({ "--d": 1 })}>
+            שלושה צעדים, ומכאן היא עובדת בשבילכם
+          </h2>
         </div>
-        <div className="fx-tilt mx-auto mt-10 max-w-4xl" data-fx suppressHydrationWarning>
+        <ol className="mt-10 grid gap-3 lg:grid-cols-3">
+          {HOW_STEPS.map((step, index) => (
+            <li key={step.title} className="card reveal" suppressHydrationWarning style={vars({ "--d": index })}>
+              <span className="display block text-5xl tabular-nums text-ghost">{index + 1}</span>
+              <h3 className="display mt-4 text-xl">{step.title}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-muted">{step.body}</p>
+            </li>
+          ))}
+        </ol>
+        <div className="fx-tilt mx-auto mt-12 max-w-4xl" data-fx suppressHydrationWarning>
           <Showcase tabs={TABS}>
             <ReceivingDemo />
             <CatalogDemo />
@@ -343,10 +358,7 @@ export function LandingSections({ cta }: { cta: { href: string; label: string } 
           </Showcase>
           <p className="mt-3 text-center text-xs text-muted">ההדגמה להמחשה בלבד; הפריטים והמספרים אינם אמיתיים.</p>
         </div>
-      </section>
-
-      <section className="section py-10!" aria-label="סוגי מסמכים וקודים נתמכים">
-        <p className="eyebrow reveal text-center" suppressHydrationWarning>עובד עם המסמכים והקודים שכבר יש לכם</p>
+        <p className="eyebrow reveal mt-14 text-center" suppressHydrationWarning>עובד עם המסמכים והקודים שכבר יש לכם</p>
         <div className="marquee reveal mt-6" suppressHydrationWarning style={vars({ "--d": 1 })}>
           <div className="marquee-track">
             {[0, 1].map((copy) => (
@@ -361,56 +373,6 @@ export function LandingSections({ cta }: { cta: { href: string; label: string } 
             ))}
           </div>
         </div>
-      </section>
-
-      <section className="section" id="idea" data-nav="הרעיון" aria-label="הרעיון">
-        <Reading
-          paragraphs={[
-            ["Business OS הוא מה שקורה כשהעסק מפסיק לחכות שתיזכרו בהכול."],
-            [
-              "הוא שם לב ש~",
-              <Tone key="a" tone="var(--tone-a)" glyph="↓">המלאי</Tone>,
-              "עומד להיגמר ומכין הזמנה לספק. הוא מכין",
-              <Tone key="b" tone="var(--tone-b)" glyph="✦">מבצע</Tone>,
-              "למוצר שלא זז. ובסוף החודש הוא מרכז ל~",
-              <Tone key="c" tone="var(--tone-c)" glyph="₪">רואה החשבון</Tone>,
-              "את כל החומר.",
-            ],
-            ["אתם רק בודקים ומאשרים."],
-          ]}
-        />
-      </section>
-
-      <section className="section" id="layers" data-nav="שלוש שכבות" aria-labelledby="layers-heading">
-        <div className="max-w-2xl">
-          <p className="eyebrow reveal" suppressHydrationWarning>שלוש שכבות, מקור אמת אחד</p>
-          <h2 id="layers-heading" className="section-title reveal mt-3" suppressHydrationWarning style={vars({ "--d": 1 })}>
-            המסמך, הקטלוג והמלאי מדברים זה עם זה
-          </h2>
-        </div>
-        <Story steps={STORY_STEPS}>
-          <TiltScene>
-            <div className="scene3d-inner">
-              <div className="plane plane-ground" style={vars({ "--z": -60 })} />
-              <div className="plane plane-stock" style={vars({ "--z": 0 })}>
-                {Array.from({ length: 20 }, (_, cell) => (
-                  <b key={cell} style={vars({ "--c": (cell * 7) % 11 })} />
-                ))}
-              </div>
-              <div className="plane plane-catalog" style={vars({ "--z": 90 })}>
-                {Array.from({ length: 7 }, (_, row) => (
-                  <span key={row}><i /></span>
-                ))}
-              </div>
-              <div className="plane plane-paper" style={vars({ "--z": 180 })}>
-                {["70%", "100%", "85%", "100%", "60%", "90%", "100%", "45%"].map((width, line) => (
-                  <i key={line} style={{ width }} />
-                ))}
-                <span className="scan-beam" />
-              </div>
-            </div>
-          </TiltScene>
-        </Story>
       </section>
 
       <section className="section" id="features" data-nav="יכולות" aria-labelledby="features-heading">

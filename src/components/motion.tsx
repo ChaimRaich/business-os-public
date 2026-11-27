@@ -432,9 +432,8 @@ export function Story({ steps, children }: { steps: { title: string; body: strin
 }
 
 const SECTIONS = [
-  { id: "showcase", label: "הדגמה" },
-  { id: "idea", label: "הרעיון" },
-  { id: "layers", label: "שלוש שכבות" },
+  { id: "initiative", label: "יוזמות" },
+  { id: "how", label: "איך זה עובד" },
   { id: "features", label: "יכולות" },
   { id: "faq", label: "שאלות" },
   { id: "start", label: "מתחילים" },

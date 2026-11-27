@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import Link from "next/link";
 import { LandingSections } from "@/components/landing";
 import { LogoTile } from "@/components/logo";
@@ -53,17 +53,20 @@ export function SiteFooter({ columns = [], home = "/" }: { columns?: FooterColum
   );
 }
 
-/** The entry screens (login, signup, first business): hero copy over a form card, then the full story. */
+/** The entry screens (login, signup, first business): the promise beside the form card, then the full story. */
 export function EntryScreen({
   badge,
   title,
   lede,
+  points = [],
   children,
   footer,
 }: {
   badge: string;
   title: ReactNode;
   lede: string;
+  /** Short reassurances under the lede. Shown beside the form on wide screens only, so the form stays close on a phone. */
+  points?: string[];
   children: ReactNode;
   footer?: ReactNode;
 }) {
@@ -80,14 +83,28 @@ export function EntryScreen({
           </div>
         </SiteHeader>
         <main className="rail flex-1">
-          <section className="bleed hero frame-row scroll-mt-24 py-12 text-center sm:py-16" id="enter" data-fx suppressHydrationWarning>
-            <div><div className="hero-in flex flex-col items-center">
-              <span className="pill">{badge}</span>
-              <p className="hero-title mt-5 max-w-3xl">{title}</p>
-              <p className="lede mt-6 max-w-xl">{lede}</p>
-              <div className="card mt-10 w-full max-w-sm text-start">{children}</div>
-              {footer && <div className="mt-4 text-sm text-muted">{footer}</div>}
-            </div></div>
+          <section className="bleed hero frame-row scroll-mt-24 py-12 sm:py-16" id="enter" data-fx suppressHydrationWarning>
+            <div className="hero-in grid items-center gap-x-12 gap-y-10 lg:grid-cols-[minmax(0,1fr)_22rem]">
+              <div className="flex flex-col items-center text-center lg:items-start lg:text-start">
+                <span className="pill">{badge}</span>
+                <p className="hero-title entry-title mt-5">{title}</p>
+                <p className="lede mt-6 max-w-xl">{lede}</p>
+                {points.length > 0 && (
+                  <ul className="mt-7 hidden flex-col gap-2.5 text-sm text-bright lg:flex">
+                    {points.map((point) => (
+                      <li key={point} className="flex items-center gap-2.5">
+                        <span className="glyph" style={{ "--glyph": "#b4d61f" } as CSSProperties} aria-hidden="true">✓</span>
+                        {point}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <div className="mx-auto w-full max-w-sm">
+                <div className="card text-start">{children}</div>
+                {footer && <div className="mt-4 text-center text-sm text-muted">{footer}</div>}
+              </div>
+            </div>
           </section>
           <LandingSections cta={{ href: "#enter", label: "מתחילים עכשיו" }} />
         </main>

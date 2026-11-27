@@ -1,14 +1,12 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { LandingSections } from "@/components/landing";
-import { RotatingText, SectionDots } from "@/components/motion";
 import { requireBusiness } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { can, ROLE_LABELS } from "@/lib/permissions";
+import { can } from "@/lib/permissions";
 import { formatAmount } from "@/lib/documents";
 import { loadAccounting, openPayables, todayInIsrael } from "@/lib/accounting";
 import { addDays } from "@/lib/campaigns";
-import { loadInitiatives, type Initiative } from "@/lib/initiatives";
+import { loadInitiatives, SLOW_DAYS, type Initiative } from "@/lib/initiatives";
 import Loading from "./loading";
 
 type Task = { href: string; text: string; urgent?: boolean };
@@ -17,9 +15,8 @@ type Area = {
   title: string;
   /** File name of the small 3D picture in public/icons/3d. */
   icon: string;
-  figures: { label: string; value: string }[];
+  figure: { label: string; value: string };
   tasks: Task[];
-  action: { href: string; label: string };
 };
 
 // The home screen has no folder of its own for a loading file, so its boundary is here:
@@ -38,7 +35,12 @@ const INITIATIVE_LOOK: Record<Initiative["kind"], { label: string; glyph: string
   accountant: { label: "ראיית חשבון", glyph: "₪", tone: "var(--tone-c)" },
 };
 
-/** The hub: what the system started on its own, then one card per area with what is waiting in it. */
+const dayFormat = new Intl.DateTimeFormat("he-IL", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
+
+/**
+ * The work desk. It answers one question, "what needs me now?": first what the system
+ * prepared for approval, then what is waiting in each area, with the state of the business beside them.
+ */
 async function Hub() {
   const { active } = await requireBusiness();
   const supabase = await createClient();
@@ -90,17 +92,15 @@ async function Hub() {
       href: "/products",
       title: "מלאי",
       icon: "package",
-      figures: [{ label: "מוצרים בקטלוג", value: String(products.count ?? 0) }],
+      figure: { label: "מוצרים בקטלוג", value: String(products.count ?? 0) },
       tasks: stockTasks,
-      action: { href: "/receiving/new", label: "קליטת סחורה" },
     },
     {
       href: "/campaigns",
       title: "קמפיינים",
       icon: "megaphone",
-      figures: [{ label: "קמפיינים פעילים עכשיו", value: String(activeCampaigns.count ?? 0) }],
+      figure: { label: "קמפיינים פעילים עכשיו", value: String(activeCampaigns.count ?? 0) },
       tasks: campaignTasks,
-      action: { href: "/campaigns", label: "לקמפיינים" },
     },
   ];
   if (accounting) {
@@ -109,147 +109,181 @@ async function Hub() {
       href: "/accounting",
       title: "ראיית חשבון",
       icon: "receipt",
-      figures: [{ label: "פתוח לתשלום", value: `${formatAmount(open.total, 0)} ₪` }],
+      figure: { label: "פתוח לתשלום", value: `${formatAmount(open.total, 0)} ₪` },
       tasks: [
         open.overdue ? { href: "/accounting", text: plural(open.overdue, "תשלום אחד באיחור", "תשלומים באיחור"), urgent: true } : null,
         open.count ? { href: "/accounting", text: plural(open.count, "מסמך אחד שעוד לא שולם", "מסמכים שעוד לא שולמו") } : null,
       ].filter((task) => task !== null),
-      action: { href: "/accounting", label: "לראיית החשבון" },
     });
   }
 
-  const waiting = areas.reduce((total, area) => total + area.tasks.length, 0);
+  // One queue across the areas, the urgent ones first.
+  const tasks = areas
+    .flatMap((area) => area.tasks.map((task) => ({ ...task, area: area.title })))
+    .sort((a, b) => Number(b.urgent ?? false) - Number(a.urgent ?? false));
+  const urgent = tasks.filter((task) => task.urgent).length;
+  const waiting = initiatives.length + tasks.length;
+  const isNew = (products.count ?? 0) === 0;
+
+  const summary = [
+    initiatives.length ? plural(initiatives.length, "יוזמה אחת שהמערכת הכינה", "יוזמות שהמערכת הכינה") : null,
+    tasks.length ? plural(tasks.length, "דבר אחד לטיפול", "דברים לטיפול") : null,
+    urgent ? plural(urgent, "אחד דחוף", "דחופים") : null,
+  ].filter((part) => part !== null);
 
   return (
-    <div className="flex flex-col gap-12">
-      <section className="bleed hero frame-row -mt-8 py-12 text-center sm:-mt-10 sm:py-16" data-fx suppressHydrationWarning>
-        <div className="fx-hero"><div className="hero-in">
-        <span className="pill">
-          <bdi>{active.businessName}</bdi>
-          <span aria-hidden="true">·</span>
-          {ROLE_LABELS[active.role]}
-        </span>
-        <h1 className="hero-title mx-auto mt-5 max-w-3xl">
-          עסק שמפעיל את עצמו.
-          <br />
-          <RotatingText phrases={["מזמין מה שחסר.", "יוזם מבצעים.", "סוגר את החודש.", "אתם רק מאשרים."]} />
-        </h1>
-        <p className="lede mx-auto mt-6 max-w-xl">
-          {initiatives.length > 0
-            ? `המערכת הכינה ${initiatives.length === 1 ? "יוזמה אחת" : `${initiatives.length} יוזמות`}. נשאר לכם לבדוק ולאשר.`
-            : waiting === 0
-              ? "אין כרגע דבר שמחכה לטיפול."
-              : "זה מה שמחכה לטיפול היום."}
-        </p>
-        <div className="mt-8 flex flex-wrap justify-center gap-3">
-          {initiatives.length > 0 ? (
-            <>
-              <a href="#initiatives" className="btn btn-lg">
-                ליוזמות שמחכות לאישור
-              </a>
-              <Link href="/receiving/new" className="btn-quiet btn-lg">
-                קליטת סחורה
-              </Link>
-            </>
-          ) : (
-            <>
-              <Link href="/receiving/new" className="btn btn-lg">
-                קליטת סחורה
-              </Link>
-              <Link href="/campaigns" className="btn-quiet btn-lg">
-                קמפיינים
-              </Link>
-            </>
-          )}
+    <div className="flex flex-col gap-10">
+      <header className="bleed hero frame-row -mt-8 py-8 sm:-mt-10 sm:py-10">
+        <div className="hero-in flex flex-wrap items-end justify-between gap-x-8 gap-y-6">
+          <div className="min-w-0">
+            <p className="eyebrow">{dayFormat.format(new Date(`${today}T00:00:00Z`))}</p>
+            <h1 className="mt-2 text-3xl sm:text-4xl">
+              {isNew ? "מתחילים. שלושה צעדים והמערכת עובדת." : waiting === 0 ? "הכול מטופל." : `${plural(waiting, "דבר אחד מחכה", "דברים מחכים")} לכם היום.`}
+            </h1>
+            <p className="mt-2 text-sm text-muted">
+              {isNew
+                ? "ברגע שיש סחורה ומכירות במערכת, היא מתחילה להכין בשבילכם את הצעד הבא."
+                : waiting === 0
+                  ? "אין כרגע דבר שמחכה לאישור או לטיפול."
+                  : `${summary.join(" · ")}.`}
+            </p>
+          </div>
+          <nav aria-label="פעולות מהירות" className="flex flex-wrap gap-2">
+            <Link href="/receiving/new" className="btn">
+              קליטת סחורה
+            </Link>
+            <Link href="/sales/import" className="btn-quiet">
+              ייבוא מכירות
+            </Link>
+            <Link href="/campaigns#new-campaign" className="btn-quiet">
+              קמפיין חדש
+            </Link>
+          </nav>
         </div>
-        </div></div>
-      </section>
+      </header>
 
-      <section id="initiatives" className="scroll-mt-28" aria-labelledby="initiatives-heading">
-        <p className="eyebrow">המערכת יזמה</p>
-        <h2 id="initiatives-heading" className="mt-2 text-3xl">
-          {initiatives.length > 0 ? "מוכן לאישור שלכם" : "אין כרגע יוזמה חדשה"}
-        </h2>
-        {initiatives.length === 0 ? (
-          <p className="mt-3 max-w-prose text-sm text-muted">
-            בכל כניסה המערכת בודקת שלושה דברים: פריטים שירדו מתחת לסף המלאי, מוצרים שנמצאים במלאי ולא נמכרו 30 יום, וחודש
-            שנסגר ומחכה לרואה החשבון. כשאחד מהם קורה, הצעד הבא יופיע כאן מוכן.
-          </p>
-        ) : (
-          <ul className={`mt-6 grid gap-3 ${initiatives.length >= 3 ? "lg:grid-cols-3" : "sm:grid-cols-2"}`}>
-            {initiatives.map((initiative) => {
-              const look = INITIATIVE_LOOK[initiative.kind];
-              return (
-                <li key={initiative.href} className="card reveal flex flex-col gap-3" suppressHydrationWarning>
-                  <p className="flex items-center gap-2 text-sm text-muted">
-                    <span className="glyph" style={{ "--glyph": look.tone } as React.CSSProperties} aria-hidden="true">
-                      {look.glyph}
-                    </span>
-                    {look.label}
-                  </p>
-                  <h3 className="display text-xl">
-                    <bdi>{initiative.title}</bdi>
-                  </h3>
-                  <p className="text-sm leading-relaxed text-muted">
-                    <bdi>{initiative.reason}</bdi>
-                  </p>
-                  <Link href={initiative.href} className="btn mt-auto self-start">
-                    {initiative.action}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-        <p className="mt-4 text-xs text-muted">המערכת מכינה ומציעה. שום דבר לא נשלח, לא מתפרסם ולא מוזמן בלי האישור שלכם.</p>
-      </section>
+      <div className="grid items-start gap-x-8 gap-y-10 lg:grid-cols-[minmax(0,1.75fr)_minmax(0,1fr)]">
+        <div className="flex min-w-0 flex-col gap-10">
+          {isNew && (
+            <section aria-labelledby="start-heading">
+              <h2 id="start-heading" className="text-xl">
+                מתחילים כאן
+              </h2>
+              <ol className="card mt-4 divide-y divide-line p-0! sm:p-0!">
+                {FIRST_STEPS.map((step, index) => (
+                  <li key={step.href}>
+                    <Link href={step.href} className="group flex items-center gap-4 px-5 py-4">
+                      <span className="display grid size-9 shrink-0 place-items-center rounded-full bg-raised text-base tabular-nums">{index + 1}</span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block font-medium group-hover:text-accent">{step.title}</span>
+                        <span className="mt-0.5 block text-sm text-muted">{step.body}</span>
+                      </span>
+                      <span className="text-muted transition-transform group-hover:-translate-x-1" aria-hidden="true">←</span>
+                    </Link>
+                  </li>
+                ))}
+              </ol>
+            </section>
+          )}
 
-      <section aria-labelledby="areas-heading">
-        <p className="eyebrow">העסק שלכם</p>
-        <h2 id="areas-heading" className="mt-2 text-3xl">
-          מה מחכה לטיפול
-        </h2>
-        <div className={`mt-6 grid gap-3 ${areas.length === 3 ? "lg:grid-cols-3" : "sm:grid-cols-2"}`}>
-          {areas.map((area) => (
-            <section key={area.href} className="card reveal flex flex-col gap-4" suppressHydrationWarning aria-labelledby={`area-${area.href.slice(1)}`}>
-              <div className="flex items-center justify-between gap-3">
-                <h3 id={`area-${area.href.slice(1)}`} className="eyebrow">
-                  <Link href={area.href} className="hover:text-accent">{area.title}</Link>
-                </h3>
-                {/* eslint-disable-next-line @next/next/no-img-element -- a 4 KB decorative picture, already sized */}
-                <img src={`/icons/3d/${area.icon}.webp`} alt="" width={44} height={44} className="icon-3d" />
-              </div>
-              {area.figures.map((figure) => (
-                <p key={figure.label}>
-                  <bdi dir="ltr" className="display block text-5xl tabular-nums">{figure.value}</bdi>
-                  <span className="mt-1 block text-sm text-muted">{figure.label}</span>
-                </p>
-              ))}
-              {area.tasks.length === 0 ? (
-                <p className="text-sm text-muted">הכול מטופל.</p>
-              ) : (
-                <ul className="flex flex-col gap-1.5 text-sm">
-                  {area.tasks.map((task) => (
-                    <li key={task.text}>
-                      <Link href={task.href} className={`flex min-h-11 items-center rounded-lg px-3 hover:underline ${task.urgent ? "bg-danger-soft text-danger" : "bg-warn-soft text-warn"}`}>
-                        {task.text}
+          {/* A business with nothing in it yet has no queue to show; the first steps stand alone. */}
+          {!(isNew && waiting === 0) && (<>
+          <section id="initiatives" aria-labelledby="initiatives-heading">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+              <h2 id="initiatives-heading" className="text-xl">
+                המערכת הכינה, מחכה לאישור שלכם
+              </h2>
+              {initiatives.length > 0 && <span className="chip tabular-nums">{initiatives.length}</span>}
+            </div>
+            {initiatives.length === 0 ? (
+              <p className="card mt-4 text-sm leading-relaxed text-muted">
+                אין כרגע יוזמה חדשה. בכל כניסה המערכת בודקת חוסרים במלאי, מוצרים שלא נמכרו {SLOW_DAYS} יום, וחודש שנסגר ומחכה לרואה
+                החשבון. כשאחד מהם קורה, הצעד הבא יופיע כאן מוכן.
+              </p>
+            ) : (
+              <ul className="card mt-4 divide-y divide-line p-0! sm:p-0!">
+                {initiatives.map((initiative) => {
+                  const look = INITIATIVE_LOOK[initiative.kind];
+                  return (
+                    <li key={initiative.href} className="flex flex-wrap items-center gap-x-4 gap-y-3 px-5 py-4">
+                      <span className="glyph size-9! rounded-[9px]! text-base!" style={{ "--glyph": look.tone } as React.CSSProperties} aria-hidden="true">
+                        {look.glyph}
+                      </span>
+                      <div className="min-w-48 flex-1">
+                        <h3 className="font-medium">
+                          <bdi>{initiative.title}</bdi>
+                        </h3>
+                        <p className="mt-0.5 text-sm leading-relaxed text-muted">
+                          <bdi>{initiative.reason}</bdi>
+                        </p>
+                      </div>
+                      <Link href={initiative.href} className="btn">
+                        {initiative.action}
                       </Link>
                     </li>
-                  ))}
-                </ul>
-              )}
-              <Link href={area.action.href} className="btn-quiet mt-auto self-start">
-                {area.action.label}
-              </Link>
-            </section>
-          ))}
-        </div>
-      </section>
+                  );
+                })}
+              </ul>
+            )}
+            <p className="mt-3 text-xs text-muted">שום דבר לא נשלח, לא מתפרסם ולא מוזמן בלי האישור שלכם.</p>
+          </section>
 
-      <div className="-mb-8 sm:-mb-10">
-        <LandingSections cta={{ href: "/receiving/new", label: "קליטת סחורה" }} />
+          <section aria-labelledby="tasks-heading">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+              <h2 id="tasks-heading" className="text-xl">
+                מה מחכה לטיפול
+              </h2>
+              {tasks.length > 0 && <span className={`chip tabular-nums ${urgent ? "chip-warn" : ""}`}>{tasks.length}</span>}
+            </div>
+            {tasks.length === 0 ? (
+              <p className="card mt-4 text-sm text-muted">הכול מטופל.</p>
+            ) : (
+              <ul className="card mt-4 divide-y divide-line p-0! sm:p-0!">
+                {tasks.map((task) => (
+                  <li key={task.text}>
+                    <Link href={task.href} className="group flex min-h-14 items-center gap-3 px-5 py-3 text-sm">
+                      <span className={`size-2 shrink-0 rounded-full ${task.urgent ? "bg-danger" : "bg-warn"}`} aria-hidden="true" />
+                      <span className="min-w-0 flex-1 group-hover:underline">
+                        {task.text}
+                        {task.urgent && <span className="ms-2 text-xs font-medium text-danger">דחוף</span>}
+                      </span>
+                      <span className="hidden text-xs text-muted sm:block">{task.area}</span>
+                      <span className="text-muted transition-transform group-hover:-translate-x-1" aria-hidden="true">←</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+          </>)}
+        </div>
+
+        <aside aria-labelledby="areas-heading" className="min-w-0">
+          <h2 id="areas-heading" className="text-xl">
+            מצב העסק
+          </h2>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+            {areas.map((area) => (
+              <Link key={area.href} href={area.href} className="card lift flex items-center gap-4">
+                <span className="min-w-0 flex-1">
+                  <span className="eyebrow block">{area.title}</span>
+                  <bdi dir="ltr" className="display mt-2 block text-4xl tabular-nums">{area.figure.value}</bdi>
+                  <span className="mt-1 block text-sm text-muted">{area.figure.label}</span>
+                </span>
+                {/* eslint-disable-next-line @next/next/no-img-element -- a 4 KB decorative picture, already sized */}
+                <img src={`/icons/3d/${area.icon}.webp`} alt="" width={44} height={44} className="icon-3d" />
+              </Link>
+            ))}
+          </div>
+        </aside>
       </div>
-      <SectionDots />
     </div>
   );
 }
+
+/** Shown while the catalog is still empty: what gets a new business to its first initiative. */
+const FIRST_STEPS = [
+  { href: "/receiving/new", title: "קולטים את הסחורה הראשונה", body: "מצלמים תעודת משלוח או חשבונית. המוצרים נכנסים לקטלוג ולמלאי." },
+  { href: "/sales/import", title: "מייבאים מכירות מהקופה", body: "כך המערכת יודעת מה נמכר, מה עומד ומה עומד להיגמר." },
+  { href: "/integrations/setup", title: "מחברים את מערכות העסק", body: "קופה, אתר וספקים, בהקמה מודרכת." },
+];

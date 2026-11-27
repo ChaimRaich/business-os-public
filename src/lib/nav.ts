@@ -63,9 +63,7 @@ export const LANDING_FOOTER_COLUMNS: FooterColumn[] = [
     title: "המערכת",
     links: [
       { href: "#initiative", label: "יוזמות" },
-      { href: "#showcase", label: "הדגמה" },
-      { href: "#idea", label: "הרעיון" },
-      { href: "#layers", label: "שלוש שכבות" },
+      { href: "#how", label: "איך זה עובד" },
       { href: "#features", label: "יכולות" },
     ],
   },

@@ -1552,7 +1552,8 @@ html {
   .chat-panel[data-view] .chat-thread {
     display: flex;
   }
-  .chat-narrow-only {
+  /* Scoped to the panel so it wins over .chat-head-btn, which is declared later. */
+  .chat-panel .chat-narrow-only {
     display: none;
   }
 }

@@ -64,6 +64,7 @@
   --tone-b: #b79cff;
   --tone-c: #dcbb15;
   --scrim: #1f1f1fb8;
+  --nav-scrim: #1f1f1fe0;
   --hero-top: #2e2e2e;
   --hero-bottom: #262626;
   --hero-glow: #ffffff12;
@@ -116,6 +117,7 @@
   --tone-b: #6a45d6;
   --tone-c: #7d6200;
   --scrim: #f3f0e9c7;
+  --nav-scrim: #f3f0e9e6;
   --hero-top: #f8f6f0;
   --hero-bottom: #ece8df;
   --hero-glow: #ffffffcc;
@@ -238,9 +240,9 @@ h2,
 }
 
 .site-header {
-  background: var(--scrim);
-  backdrop-filter: blur(24px) saturate(125%);
-  -webkit-backdrop-filter: blur(24px) saturate(125%);
+  background: var(--nav-scrim);
+  backdrop-filter: blur(48px) saturate(180%);
+  -webkit-backdrop-filter: blur(48px) saturate(180%);
   transition:
     background-color 0.2s,
     border-color 0.2s,
@@ -290,9 +292,9 @@ h2,
   padding-inline: 0.875rem 0.625rem;
   border: 1px solid var(--line);
   border-radius: 14px;
-  background: var(--scrim);
-  backdrop-filter: blur(28px) saturate(125%);
-  -webkit-backdrop-filter: blur(28px) saturate(125%);
+  background: var(--nav-scrim);
+  backdrop-filter: blur(48px) saturate(180%);
+  -webkit-backdrop-filter: blur(48px) saturate(180%);
   box-shadow:
     0 0 0 1px var(--rule),
     var(--float-shadow),

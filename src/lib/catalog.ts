@@ -36,9 +36,6 @@ export function catalogErrorMessage(error: DbError): string {
   if (text.includes("product_variants_label_key")) {
     return "יש כבר וריאציה בשם הזה במוצר. לכל וריאציה צריך שם שונה.";
   }
-  if (text.includes("document_locked") || (error.code === "23503" && /stock_(movements|balances)/.test(text))) {
-    return "אי אפשר למחוק: לפריט יש תנועות מלאי או שהוא מופיע בקליטה מאושרת.";
-  }
   if (text.includes("last_variant")) {
     return "למוצר חייבת להישאר לפחות וריאציה אחת.";
   }

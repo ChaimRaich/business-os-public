@@ -52,5 +52,6 @@ function redirectTo(request: NextRequest, from: NextResponse, pathname: string) 
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)"],
+  // The manifest and the service worker are fetched without the session cookie, so they stay public.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)"],
 };

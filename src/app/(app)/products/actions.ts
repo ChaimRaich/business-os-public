@@ -12,9 +12,8 @@ import {
   text,
   type CodeKind,
 } from "@/lib/catalog";
-import type { FormState } from "@/components/action-form";
 import { parseAmount } from "@/lib/documents";
-import { asMaterial, asProductType } from "@/lib/pricing";
+import type { FormState } from "@/components/action-form";
 
 type VariantInput = {
   label: string;
@@ -141,11 +140,6 @@ export async function updateProduct(_: FormState, formData: FormData): Promise<F
   if (!id || !name) {
     return { error: "יש להזין שם מוצר." };
   }
-  const salePrice = parseAmount(text(formData, "sale_price"));
-  const clubPrice = parseAmount(text(formData, "club_price"));
-  if (salePrice === undefined || clubPrice === undefined || salePrice === 0 || clubPrice === 0) {
-    return { error: "מחיר צריך להיות מספר גדול מאפס, או ריק." };
-  }
 
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -154,10 +148,6 @@ export async function updateProduct(_: FormState, formData: FormData): Promise<F
       name,
       supplier_id: optional(formData, "supplier_id"),
       notes: optional(formData, "notes"),
-      product_type: asProductType(formData.get("product_type")),
-      material: asMaterial(formData.get("material")),
-      sale_price: salePrice,
-      club_price: clubPrice,
     })
     .eq("id", id)
     .eq("business_id", active.businessId)
@@ -304,4 +294,59 @@ export async function deleteCode(_: FormState, formData: FormData): Promise<Form
   revalidatePath(`/products/${productId}`);
   revalidatePath("/products");
   return null;
+}
+
+/** The shortage threshold of one item. Empty goes back to the business default. */
+export async function setLowStockThreshold(_: FormState, formData: FormData): Promise<FormState> {
+  const { active } = await requireBusiness();
+  const productId = text(formData, "product_id");
+  const raw = text(formData, "threshold");
+  const value = raw === "" ? null : parseAmount(raw);
+  if (value === undefined || (value !== null && value > 100000)) {
+    return { error: "הסף צריך להיות מספר, 0 ומעלה." };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("product_variants")
+    .update({ low_stock_threshold: value })
+    .eq("id", text(formData, "variant_id"))
+    .eq("business_id", active.businessId)
+    .select("id");
+  if (error || data.length === 0) {
+    return { error: error ? catalogErrorMessage(error) : "הפריט לא נמצא." };
+  }
+  revalidatePath(`/products/${productId}`);
+  revalidatePath("/reports/stock");
+  revalidatePath("/");
+  return { ok: value === null ? "הפריט חזר לסף הכללי." : "הסף נשמר." };
+}
+
+/** Corrects a balance by a documented adjustment: "+3" or "-1", with a reason. */
+export async function adjustStock(_: FormState, formData: FormData): Promise<FormState> {
+  await requireBusiness();
+  const productId = text(formData, "product_id");
+  const raw = text(formData, "delta").replace(/\s/g, "");
+  const amount = parseAmount(raw.replace(/^[+-]/, ""));
+  if (!amount) {
+    return { error: "כתבו בכמה לשנות את המלאי, למשל 3 או ‎-1." };
+  }
+  const reason = text(formData, "reason");
+  if (!reason) {
+    return { error: "חובה לכתוב סיבה לתיקון." };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("adjust_stock", {
+    p_variant_id: text(formData, "variant_id"),
+    p_warehouse_id: text(formData, "warehouse_id"),
+    p_delta: raw.startsWith("-") ? -amount : amount,
+    p_reason: reason.slice(0, 200),
+  });
+  if (error) {
+    return { error: catalogErrorMessage(error) };
+  }
+  revalidatePath("/products");
+  revalidatePath(`/products/${productId}`);
+  return { ok: `המלאי עודכן. היתרה במחסן: ${data}.` };
 }

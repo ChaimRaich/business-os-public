@@ -8,7 +8,7 @@ import { ActionForm } from "@/components/action-form";
 import { CrmDirectory } from "@/components/crm-directory";
 import { createCustomer } from "./actions";
 
-export const metadata: Metadata = { title: "לקוחות ו-CRM" };
+export const metadata: Metadata = { title: "לקוחות" };
 
 export default async function CrmPage() {
   const { active } = await requireBusiness();
@@ -32,10 +32,7 @@ export default async function CrmPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-extrabold tracking-tight">לקוחות ו-CRM</h1>
-        <p className="mt-0.5 text-sm text-muted">ניהול לידים מקמפיינים, מועדון לקוחות VIP ושווי לקוח מצטבר</p>
-      </div>
+      <h1 className="text-3xl sm:text-4xl">לקוחות</h1>
 
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-3.5 lg:grid-cols-4">

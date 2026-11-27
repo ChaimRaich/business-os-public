@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { CheckCircle2, PlugZap } from "lucide-react";
 import { requireBusiness } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -27,22 +28,23 @@ export default async function IntegrationsPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-extrabold tracking-tight">מרכז אינטגרציות</h1>
-          <p className="mt-0.5 text-sm text-muted">
-            חיבור קופה ומסחר, הנהלת חשבונות ורו״ח, סליקה ובנקים, וקמפיינים ו-CRM
-          </p>
-        </div>
+        <h1 className="text-3xl sm:text-4xl">אינטגרציות</h1>
         <span className="badge bg-accent-soft px-3.5 py-1.5 text-accent-strong">
           <CheckCircle2 className="size-4" aria-hidden />
-          <span>{connectedCount} מתוך {INTEGRATION_CATEGORIES.length} פעילות</span>
+          <span>{connectedCount}/{INTEGRATION_CATEGORIES.length} מחוברות</span>
         </span>
       </div>
+
+      {canManage && connectedCount < INTEGRATION_CATEGORIES.length && (
+        <Link href="/integrations/setup" className="self-start text-sm font-medium text-accent-strong underline-offset-4 hover:underline">
+          הקמה מודרכת
+        </Link>
+      )}
 
       {!canManage && (
         <div className="flex items-center gap-2.5 rounded-2xl border border-line bg-surface-subtle/70 px-4 py-3 text-sm text-muted">
           <PlugZap className="size-4 shrink-0 text-accent" aria-hidden />
-          <span>רק בעלים או מנהל יכולים לערוך חיבורי אינטגרציה.</span>
+          <span>עריכה: בעלים או מנהל.</span>
         </div>
       )}
 

@@ -18,10 +18,11 @@ const PERMISSIONS = {
   "catalog.delete": ["owner", "manager"],
   "warehouses.manage": ["owner", "manager"],
   "stock.adjust": ["owner", "manager"],
-  "departments.manage": ["owner", "manager"],
+  "accounting.view": ["owner", "manager"],
+  "campaigns.delete": ["owner", "manager"],
   "integrations.manage": ["owner", "manager"],
   "finance.manage": ["owner", "manager"],
-  "campaigns.manage": ["owner", "manager"],
+  "ads.manage": ["owner", "manager"],
   "crm.delete": ["owner", "manager"],
 } as const satisfies Record<string, readonly Role[]>;
 

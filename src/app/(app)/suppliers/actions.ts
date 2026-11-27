@@ -4,8 +4,8 @@ import { revalidatePath } from "next/cache";
 import { requireBusiness } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { catalogErrorMessage, optional, text } from "@/lib/catalog";
-import type { FormState } from "@/components/action-form";
 import { parseAmount } from "@/lib/documents";
+import type { FormState } from "@/components/action-form";
 
 function supplierFields(formData: FormData) {
   return {
@@ -15,25 +15,24 @@ function supplierFields(formData: FormData) {
     address: optional(formData, "address"),
     pos_code: optional(formData, "pos_code"),
     pos_name: optional(formData, "pos_name"),
+    pos_barcode_source: text(formData, "pos_barcode_source") === "supplier" ? "supplier" : "internal",
+    pos_next_barcode: optional(formData, "pos_next_barcode"),
+    price_mode: text(formData, "price_mode") === "retail" ? "retail" : "multiplier",
+    price_multiplier: parseAmount(text(formData, "price_multiplier")),
     notes: optional(formData, "notes"),
   };
 }
 
-/** The pricing rule and barcode counter, or a message naming what is wrong. */
-function pricingFields(formData: FormData) {
-  const multiplier = parseAmount(text(formData, "club_multiplier"));
-  const markup = parseAmount(text(formData, "sale_markup_pct"));
-  const next = Number(text(formData, "next_barcode_number"));
-  if (!multiplier || multiplier > 1000) {
-    return { error: "המכפיל למחיר מועדון צריך להיות מספר גדול מאפס." };
+function rulesError(
+  fields: Pick<ReturnType<typeof supplierFields>, "price_multiplier" | "pos_next_barcode">,
+): string | null {
+  if (fields.price_multiplier === undefined || fields.price_multiplier === 0 || (fields.price_multiplier ?? 0) >= 1000) {
+    return "המכפלה צריכה להיות מספר, למשל 2.9.";
   }
-  if (typeof markup !== "number" || markup > 1000) {
-    return { error: "התוספת למחיר מכירה צריכה להיות מספר אחוזים (0 ומעלה)." };
+  if (fields.pos_next_barcode && !/^\S{0,16}\d{1,12}$/.test(fields.pos_next_barcode)) {
+    return "הברקוד הפנימי הבא צריך להסתיים במספר, בלי רווחים. למשל N12000101.";
   }
-  if (!Number.isInteger(next) || next < 1 || next > 999999) {
-    return { error: "המספר הרץ צריך להיות מספר שלם בין 1 ל-999999." };
-  }
-  return { values: { club_multiplier: multiplier, sale_markup_pct: markup, next_barcode_number: next } };
+  return null;
 }
 
 export async function createSupplier(_: FormState, formData: FormData): Promise<FormState> {
@@ -42,15 +41,15 @@ export async function createSupplier(_: FormState, formData: FormData): Promise<
   if (!fields.name) {
     return { error: "יש להזין שם ספק." };
   }
-  const pricing = pricingFields(formData);
-  if (!pricing.values) {
-    return { error: pricing.error };
+  const invalid = rulesError(fields);
+  if (invalid) {
+    return { error: invalid };
   }
 
   const supabase = await createClient();
   const { error } = await supabase
     .from("suppliers")
-    .insert({ ...fields, ...pricing.values, business_id: active.businessId });
+    .insert({ ...fields, business_id: active.businessId });
   if (error) {
     return { error: catalogErrorMessage(error) };
   }
@@ -65,15 +64,15 @@ export async function updateSupplier(_: FormState, formData: FormData): Promise<
   if (!id || !fields.name) {
     return { error: "יש להזין שם ספק." };
   }
-  const pricing = pricingFields(formData);
-  if (!pricing.values) {
-    return { error: pricing.error };
+  const invalid = rulesError(fields);
+  if (invalid) {
+    return { error: invalid };
   }
 
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("suppliers")
-    .update({ ...fields, ...pricing.values })
+    .update(fields)
     .eq("id", id)
     .eq("business_id", active.businessId)
     .select("id");
@@ -84,6 +83,50 @@ export async function updateSupplier(_: FormState, formData: FormData): Promise<
     return { error: "הספק לא נמצא." };
   }
   revalidatePath("/suppliers");
+  revalidatePath(`/suppliers/${id}`);
+  return { ok: "הפרטים נשמרו." };
+}
+
+/**
+ * The till details of a supplier, filled in from the till-file screen of a document:
+ * the file cannot be made without them, so they are asked for where they are missing.
+ */
+export async function saveSupplierTillDetails(_: FormState, formData: FormData): Promise<FormState> {
+  const { active } = await requireBusiness();
+  const id = text(formData, "id");
+  const fields = {
+    pos_code: optional(formData, "pos_code"),
+    pos_name: optional(formData, "pos_name"),
+    pos_barcode_source: text(formData, "pos_barcode_source") === "supplier" ? "supplier" : "internal",
+    pos_next_barcode: optional(formData, "pos_next_barcode"),
+    price_mode: text(formData, "price_mode") === "retail" ? "retail" : "multiplier",
+    price_multiplier: parseAmount(text(formData, "price_multiplier")),
+  };
+  if (!fields.pos_code || !fields.pos_name) {
+    return { error: "צריך את קוד הספק ואת שם הספק, כמו שהם מוגדרים בקופה." };
+  }
+  if (fields.pos_barcode_source === "internal" && !fields.pos_next_barcode) {
+    return { error: "לברקוד פנימי צריך את הברקוד הבא בתור, למשל N12000101. אם הקופה עובדת עם הקוד של הספק, בחרו באפשרות הזו." };
+  }
+  const invalid = rulesError(fields);
+  if (invalid) {
+    return { error: invalid };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("suppliers")
+    .update(fields)
+    .eq("id", id)
+    .eq("business_id", active.businessId)
+    .select("id");
+  if (error) {
+    return { error: catalogErrorMessage(error) };
+  }
+  if (data.length === 0) {
+    return { error: "הספק לא נמצא." };
+  }
+  revalidatePath("/receiving/[id]/export", "page");
   revalidatePath(`/suppliers/${id}`);
   return { ok: "הפרטים נשמרו." };
 }

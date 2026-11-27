@@ -1,36 +1,57 @@
 import type { Metadata, Viewport } from "next";
-import { Heebo } from "next/font/google";
+import { Geist_Mono, Rubik, Space_Grotesk } from "next/font/google";
+import { RevealObserver, ScrollFx } from "@/components/motion";
+import { ServiceWorker } from "@/components/service-worker";
 import "./globals.css";
 
-const heebo = Heebo({
-  variable: "--font-heebo",
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+// Body text, Hebrew and Latin alike. Geist Mono is kept for codes only (font-mono).
+const hebrewSans = Rubik({
+  variable: "--font-hebrew",
   subsets: ["hebrew", "latin"],
-  weight: ["400", "500", "600", "700", "800"],
-  display: "swap",
+});
+
+// The "Business OS" wordmark only.
+const wordmarkGrotesk = Space_Grotesk({
+  variable: "--font-wordmark-grotesk",
+  subsets: ["latin"],
+  weight: ["500", "700"],
 });
 
 export const metadata: Metadata = {
   title: { default: "Business OS", template: "%s · Business OS" },
-  description: "קליטת סחורה וסנכרון מלאי לעסקים קטנים ובינוניים",
+  description: "ניהול עסק קטן ובינוני במקום אחד: מלאי, קמפיינים וראיית חשבון",
 };
 
 export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f5f5f2" },
-    { media: "(prefers-color-scheme: dark)", color: "#0b0f13" },
-  ],
+  themeColor: "#121212",
 };
 
-// Runs before paint to apply the saved or system theme without a flash.
-const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem('bos-theme');var d=t==='dark'||(t!=='light'&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.classList.toggle('dark',d);}catch(e){}})();`;
+// Runs before first paint: applies the saved theme and marks that scripts are available,
+// so scroll-reveal content is only ever hidden when something can reveal it.
+const bootScript = `(function(){var d=document.documentElement;try{var t=localStorage.getItem("theme");d.dataset.theme=t==="light"?"light":"dark"}catch(e){d.dataset.theme="dark"}d.classList.add("js")})()`;
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="he" dir="rtl" className={`${heebo.variable} h-full antialiased`} suppressHydrationWarning>
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
-      </head>
-      <body className="flex min-h-full flex-col font-sans">{children}</body>
+    <html
+      lang="he"
+      dir="rtl"
+      // Smooth scrolling is for in-page links; Next turns it off while it moves between screens.
+      data-scroll-behavior="smooth"
+      suppressHydrationWarning
+      className={`${geistMono.variable} ${hebrewSans.variable} ${wordmarkGrotesk.variable} h-full antialiased`}
+    >
+      <body className="flex min-h-full flex-col font-sans">
+        <script dangerouslySetInnerHTML={{ __html: bootScript }} />
+        {children}
+        <RevealObserver />
+        <ScrollFx />
+        <ServiceWorker />
+      </body>
     </html>
   );
 }

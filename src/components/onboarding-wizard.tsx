@@ -8,16 +8,12 @@ import {
   KeyRound,
   Landmark,
   Loader2,
-  LogOut,
   Megaphone,
-  PlugZap,
   Rocket,
   ShieldAlert,
   Store,
 } from "lucide-react";
-import { BrandMark } from "@/components/brand-mark";
-import { BusinessSwitcher } from "@/components/business-switcher";
-import { ThemeToggle } from "@/components/theme-toggle";
+import Link from "next/link";
 import {
   INTEGRATION_CATEGORIES,
   INTEGRATION_STATUS_LABELS,
@@ -47,26 +43,13 @@ const CATEGORY_ICONS: Record<IntegrationCategory, typeof Store> = {
 };
 
 type Props = {
-  businessName: string;
-  activeBusinessId: string;
-  businesses: { id: string; name: string }[];
-  userEmail: string;
   canManage: boolean;
+  /** Whether the wizard was already finished or skipped for this business. */
+  completed: boolean;
   integrations: SavedIntegration[];
-  switchBusiness: (formData: FormData) => Promise<void>;
-  logout: () => Promise<void>;
 };
 
-export function OnboardingWizard({
-  businessName,
-  activeBusinessId,
-  businesses,
-  userEmail,
-  canManage,
-  integrations,
-  switchBusiness,
-  logout,
-}: Props) {
+export function OnboardingWizard({ canManage, completed, integrations }: Props) {
   const byCategory = new Map(integrations.map((row) => [row.category, row]));
   const firstPending =
     INTEGRATION_CATEGORIES.find((cat) => !isIntegrationReady(byCategory.get(cat.id)?.status))?.id ??
@@ -82,73 +65,28 @@ export function OnboardingWizard({
   const [completeState, completeAction, completing] = useActionState(completeOnboarding, null);
 
   return (
-    <div className="flex min-h-full flex-1 flex-col">
-      {/* Top Bar */}
-      <header className="sticky top-0 z-20 border-b border-line bg-surface/90 backdrop-blur-md">
-        <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 py-3.5 sm:px-6">
-          <div className="flex items-center gap-3">
-            <BrandMark compact />
-            <span className="hidden h-5 w-px bg-line sm:inline-block" aria-hidden />
-            {businesses.length > 1 ? (
-              <div className="w-44 sm:w-56">
-                <BusinessSwitcher action={switchBusiness} activeId={activeBusinessId} businesses={businesses} />
-              </div>
-            ) : (
-              <span className="hidden text-sm font-semibold text-ink sm:inline">{businessName}</span>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="hidden text-xs text-muted md:inline" dir="ltr">
-              {userEmail}
-            </span>
-            <ThemeToggle />
-            <form action={logout}>
-              <button
-                type="submit"
-                title="יציאה מהחשבון"
-                aria-label="יציאה מהחשבון"
-                className="inline-flex min-h-10 cursor-pointer items-center justify-center rounded-xl border border-line bg-surface px-3 text-muted hover:bg-danger-soft hover:text-danger"
-              >
-                <LogOut className="size-4" aria-hidden />
-              </button>
-            </form>
-          </div>
-        </div>
-      </header>
-
-      <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-4 py-8 sm:px-6">
+    <div className="flex flex-col gap-6">
         {/* Intro & Progress */}
         <section className="card">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="max-w-2xl">
-              <span className="badge mb-3 bg-accent-soft text-accent-strong">
-                <PlugZap className="size-3.5" aria-hidden />
-                <span>אתחול מערכת Business OS · {businessName}</span>
-              </span>
-              <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">
-                חיבור אינטגרציות לניהול העסק מקצה לקצה
-              </h1>
-              <p className="mt-2 text-sm leading-relaxed text-muted">
-                כדי שהמערכת תנהל את העסק בצורה אחידה — קופה ומלאי, הנהלת חשבונות ורו״ח, סליקה ובנקים, וקמפיינים ו-CRM — יש להגדיר חיבור לכל אחת מ-4 הקטגוריות (חיבור חי או מצב Sandbox/ידני להתחלה מהירה).
-              </p>
-            </div>
-            <div className="min-w-44 rounded-2xl border border-line bg-surface-subtle/60 p-4 text-center">
-              <span className="block text-3xl font-extrabold tabular-nums text-accent">
-                {readyCount}/{INTEGRATION_CATEGORIES.length}
-              </span>
-              <span className="mt-0.5 block text-xs font-medium text-muted">אינטגרציות מוכנות</span>
-              <div className="mt-3 h-2 overflow-hidden rounded-full bg-line">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <h1 className="text-3xl sm:text-4xl">חיבור מערכות העסק</h1>
+            <div className="flex items-center gap-3">
+              <div className="h-2 w-28 overflow-hidden rounded-full bg-line" aria-hidden>
                 <div
                   className="h-full rounded-full bg-accent transition-all duration-300"
                   style={{ width: `${(readyCount / INTEGRATION_CATEGORIES.length) * 100}%` }}
                 />
               </div>
+              <span className="text-sm font-bold tabular-nums text-accent-strong">
+                <span className="sr-only">מחוברות: </span>
+                {readyCount}/{INTEGRATION_CATEGORIES.length}
+              </span>
             </div>
           </div>
 
           {/* Stepper Tabs */}
           <div className="mt-6 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
-            {INTEGRATION_CATEGORIES.map((category, index) => {
+            {INTEGRATION_CATEGORIES.map((category) => {
               const Icon = CATEGORY_ICONS[category.id];
               const saved = byCategory.get(category.id);
               const ready = isIntegrationReady(saved?.status);
@@ -158,6 +96,7 @@ export function OnboardingWizard({
                   key={category.id}
                   type="button"
                   onClick={() => setActiveCategory(category.id)}
+                  aria-pressed={selected}
                   className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3.5 text-right transition-all ${
                     selected
                       ? "border-accent bg-accent-soft/60 shadow-xs"
@@ -169,7 +108,7 @@ export function OnboardingWizard({
                   <span
                     className={`inline-flex size-9 shrink-0 items-center justify-center rounded-xl ${
                       ready
-                        ? "bg-accent text-white dark:text-[#041815]"
+                        ? "bg-accent text-(--btn-fg)"
                         : selected
                           ? "bg-accent-soft text-accent-strong"
                           : "bg-surface text-muted"
@@ -178,11 +117,12 @@ export function OnboardingWizard({
                     {ready ? <CheckCircle2 className="size-4.5" aria-hidden /> : <Icon className="size-4.5" aria-hidden />}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-[11px] font-semibold text-muted">שלב {index + 1}</span>
                     <span className="block truncate text-sm font-bold text-ink">{category.shortTitle}</span>
-                    <span className={`block truncate text-[11px] ${ready ? "font-semibold text-accent-strong" : "text-muted"}`}>
-                      {saved ? saved.display_name : "טרם הוגדר"}
-                    </span>
+                    {saved && (
+                      <span className={`block truncate text-[11px] ${ready ? "font-semibold text-accent-strong" : "text-muted"}`}>
+                        {saved.display_name}
+                      </span>
+                    )}
                   </span>
                 </button>
               );
@@ -192,17 +132,10 @@ export function OnboardingWizard({
 
         {/* Active Step Configuration */}
         {!canManage ? (
-          <section className="card border-warning-border/50 bg-warning-soft/50">
-            <div className="flex items-start gap-3">
-              <ShieldAlert className="mt-0.5 size-5 shrink-0 text-warning" aria-hidden />
-              <div>
-                <h2 className="font-bold text-ink">ממתינים להשלמת האתחול על ידי בעל העסק או מנהל</h2>
-                <p className="mt-1 text-sm text-muted">
-                  התפקיד שלך בעסק הוא עובד. רק בעלים או מנהל יכולים לחבר את אינטגרציות הליבה ולאשר את פתיחת סביבת העבודה.
-                </p>
-              </div>
-            </div>
-          </section>
+          <p className="card flex items-center gap-2.5 text-sm text-muted">
+            <ShieldAlert className="size-4.5 shrink-0 text-warning" aria-hidden />
+            <span>רק בעלים או מנהל יכולים לחבר מערכות.</span>
+          </p>
         ) : (
           <CategoryConfigForm
             key={`${currentMeta.id}-${currentSaved?.last_synced_at ?? currentSaved?.provider ?? "new"}`}
@@ -219,35 +152,26 @@ export function OnboardingWizard({
           />
         )}
 
-        {/* Complete Onboarding Footer */}
-        <section className={`card flex flex-wrap items-center justify-between gap-4 ${allReady ? "border-accent bg-accent-soft/40" : ""}`}>
-          <div>
-            <h2 className="flex items-center gap-2 text-base font-bold text-ink">
-              <Rocket className={`size-4.5 ${allReady ? "text-accent" : "text-muted"}`} aria-hidden />
-              <span>{allReady ? "כל האינטגרציות מוכנות — אפשר להיכנס למערכת!" : "כניסה לסביבת העבודה"}</span>
-            </h2>
-            <p className="mt-1 text-sm text-muted">
-              {allReady
-                ? "כל 4 קטגוריות הליבה הוגדרו. לחצו כדי להשלים את האתחול ולפתוח את הדאשבורד וכל המודולים."
-                : `נותרו עוד ${INTEGRATION_CATEGORIES.length - readyCount} קטגוריות להגדרה לפני שניתן להפעיל את העסק.`}
+        {/* Finish or skip: the wizard never blocks the workspace. */}
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          {completeState?.error && (
+            <p className="me-auto inline-flex items-center gap-1.5 text-sm font-medium text-danger">
+              <AlertCircle className="size-4" aria-hidden />
+              <span>{completeState.error}</span>
             </p>
-            {completeState?.error && (
-              <p className="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-danger">
-                <AlertCircle className="size-4" aria-hidden />
-                <span>{completeState.error}</span>
-              </p>
-            )}
-          </div>
-          {canManage && (
+          )}
+          <Link href="/integrations" className="btn-quiet">
+            כל האינטגרציות
+          </Link>
+          {canManage && !completed && (
             <form action={completeAction}>
-              <button type="submit" className="btn px-6" disabled={!allReady || completing}>
+              <button type="submit" className={allReady ? "btn px-6" : "btn-quiet"} disabled={completing}>
                 {completing ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Rocket className="size-4" aria-hidden />}
-                <span>{completing ? "מפעיל את העסק…" : "סיום אתחול וכניסה למערכת"}</span>
+                <span>{completing ? "שומר…" : allReady ? "סיום ההקמה" : "דילוג"}</span>
               </button>
             </form>
           )}
-        </section>
-      </main>
+        </div>
     </div>
   );
 }
@@ -278,7 +202,6 @@ function CategoryConfigForm({
           <div>
             <h2 className="text-lg font-extrabold text-ink">{category.title}</h2>
             <p className="mt-0.5 text-sm text-muted">{category.description}</p>
-            <p className="mt-1 text-xs font-medium text-accent-strong">נדרש עבור: {category.requiredFor}</p>
           </div>
         </div>
         {saved && (
@@ -294,8 +217,8 @@ function CategoryConfigForm({
         <input type="hidden" name="mode" value={mode} />
 
         <div>
-          <p className="label mb-2.5">בחרו מערכת / ספק לחיבור</p>
-          <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+          <p className="label mb-2.5">מערכת</p>
+          <div className="flex flex-wrap gap-2">
             {category.providers.map((provider) => {
               const active = provider.id === providerId;
               return (
@@ -303,14 +226,14 @@ function CategoryConfigForm({
                   key={provider.id}
                   type="button"
                   onClick={() => setProviderId(provider.id)}
-                  className={`flex cursor-pointer flex-col gap-1 rounded-xl border p-3.5 text-right transition-all ${
+                  aria-pressed={active}
+                  className={`min-h-11 cursor-pointer rounded-xl border px-4 text-sm font-semibold transition-all ${
                     active
-                      ? "border-accent bg-accent-soft/55 ring-2 ring-accent/20"
-                      : "border-line bg-surface-subtle/35 hover:border-line-strong"
+                      ? "border-accent bg-accent-soft/55 text-ink ring-2 ring-accent/20"
+                      : "border-line bg-surface-subtle/35 text-muted hover:border-line-strong hover:text-ink"
                   }`}
                 >
-                  <span className="text-sm font-bold text-ink">{provider.name}</span>
-                  <span className="text-xs leading-relaxed text-muted">{provider.description}</span>
+                  {provider.name}
                 </button>
               );
             })}
@@ -319,28 +242,30 @@ function CategoryConfigForm({
 
         <div className="card-subtle flex flex-col gap-4">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-bold text-muted">מצב הפעלה:</span>
+            <span className="text-xs font-bold text-muted">מצב</span>
             <button
               type="button"
               onClick={() => setMode("live")}
+              aria-pressed={mode === "live"}
               className={`cursor-pointer rounded-xl border px-3.5 py-2 text-xs font-semibold transition-all ${
                 mode === "live"
-                  ? "border-accent bg-accent text-white dark:text-[#041815]"
+                  ? "border-accent bg-accent text-(--btn-fg)"
                   : "border-line bg-surface text-muted hover:text-ink"
               }`}
             >
-              חיבור חי (חשבון / API פעיל)
+              חיבור חי
             </button>
             <button
               type="button"
               onClick={() => setMode("sandbox")}
+              aria-pressed={mode === "sandbox"}
               className={`cursor-pointer rounded-xl border px-3.5 py-2 text-xs font-semibold transition-all ${
                 mode === "sandbox"
-                  ? "border-accent bg-accent text-white dark:text-[#041815]"
+                  ? "border-accent bg-accent text-(--btn-fg)"
                   : "border-line bg-surface text-muted hover:text-ink"
               }`}
             >
-              Sandbox / עבודה ידנית (להתחלה מהירה)
+              ידני
             </button>
           </div>
 
@@ -362,7 +287,7 @@ function CategoryConfigForm({
               <div>
                 <label className="label flex items-center gap-1.5" htmlFor={`key-${category.id}`}>
                   <KeyRound className="size-3.5 text-accent" aria-hidden />
-                  <span>מפתח API / Token</span>
+                  <span>מפתח API</span>
                 </label>
                 <input
                   className="field font-mono text-sm"
@@ -371,10 +296,10 @@ function CategoryConfigForm({
                   type="password"
                   dir="ltr"
                   autoComplete="off"
-                  placeholder={saved?.credential_hint ? `שמור (${saved.credential_hint})` : "הזינו מפתח חיבור…"}
+                  placeholder={saved?.credential_hint ? `שמור (${saved.credential_hint})` : ""}
                 />
                 <p className="mt-1 text-[11px] text-muted">
-                  המערכת שומרת רק חתימת זיהוי מוסתרת (4 ספרות אחרונות) לאימות החיבור.
+                  נשמרות רק 4 הספרות האחרונות.
                 </p>
               </div>
             )}
@@ -384,11 +309,11 @@ function CategoryConfigForm({
         <div className="flex flex-wrap items-center gap-3">
           <button type="submit" className="btn" disabled={pending}>
             {pending ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <CheckCircle2 className="size-4" aria-hidden />}
-            <span>{pending ? "שומר חיבור…" : `שמירת ${category.shortTitle}`}</span>
+            <span>{pending ? "שומר…" : "שמירה"}</span>
           </button>
           {state?.ok && (
             <button type="button" className="btn-quiet" onClick={onSavedNext}>
-              מעבר לשלב הבא
+              לשלב הבא
             </button>
           )}
           <div aria-live="polite" className="empty:hidden">

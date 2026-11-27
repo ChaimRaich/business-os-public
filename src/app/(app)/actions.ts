@@ -8,8 +8,6 @@ import { ACTIVE_BUSINESS_COOKIE, getMemberships, requireBusiness, requireUser } 
 import { ROLES, type Role } from "@/lib/permissions";
 import { catalogErrorMessage } from "@/lib/catalog";
 import type { FormState } from "@/components/action-form";
-import { asProductType, PRODUCT_TYPE_LABELS } from "@/lib/pricing";
-import { SAMPLE_DEPARTMENTS } from "@/lib/departments";
 
 // Every action re-reads the session and takes the business id from the server-side
 // context, never from the form. Postgres RLS is what actually enforces access.
@@ -81,6 +79,33 @@ export async function renameBusiness(_: FormState, formData: FormData): Promise<
   }
   revalidatePath("/", "layout");
   return { ok: "השם עודכן." };
+}
+
+/** The shortage threshold for items that have none of their own. Empty clears it. */
+export async function setLowStockDefault(_: FormState, formData: FormData): Promise<FormState> {
+  const { active } = await requireBusiness();
+  const raw = String(formData.get("low_stock_default") ?? "").trim();
+  const value = raw === "" ? null : Number(raw);
+  if (value !== null && (!/^\d+(\.\d+)?$/.test(raw) || value > 100000)) {
+    return { error: "הסף צריך להיות מספר, 0 ומעלה." };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("businesses")
+    .update({ low_stock_default: value })
+    .eq("id", active.businessId)
+    .select("id");
+  if (error) {
+    return { error: GENERIC_ERROR };
+  }
+  if (data.length === 0) {
+    return { error: "רק בעלי העסק יכולים לשנות את הסף הכללי." };
+  }
+  revalidatePath("/reports/stock");
+  revalidatePath("/settings");
+  revalidatePath("/");
+  return { ok: value === null ? "הסף הכללי בוטל." : "הסף הכללי נשמר." };
 }
 
 export async function addMember(_: FormState, formData: FormData): Promise<FormState> {
@@ -235,58 +260,47 @@ export async function setDefaultWarehouse(_: FormState, formData: FormData): Pro
   return null;
 }
 
-/** Saves one product type's POS department; clearing all three fields removes it. */
-export async function saveDepartment(_: FormState, formData: FormData): Promise<FormState> {
+export async function addPosDepartment(_: FormState, formData: FormData): Promise<FormState> {
   const { active } = await requireBusiness();
-  const productType = asProductType(formData.get("product_type"));
-  const code = String(formData.get("code") ?? "").trim();
-  const department = String(formData.get("department") ?? "").trim();
-  const subDepartment = String(formData.get("sub_department") ?? "").trim();
-  if (!productType) {
-    return { error: GENERIC_ERROR };
+  const field = (key: string) => String(formData.get(key) ?? "").trim();
+  const code = field("code");
+  if (!/^\d{1,9}$/.test(code) || !field("department") || !field("sub_department")) {
+    return { error: "צריך קוד מחלקה מספרי, שם מחלקה ושם תת מחלקה, כמו שהם בקופה." };
   }
-  const supabase = await createClient();
 
-  if (!code && !department && !subDepartment) {
-    const { error } = await supabase
-      .from("departments")
-      .delete()
-      .eq("business_id", active.businessId)
-      .eq("product_type", productType);
-    if (error) {
-      return { error: catalogErrorMessage(error) };
-    }
-    revalidatePath("/settings");
-    return { ok: "נמחק." };
-  }
-  if (!/^[0-9]{1,9}$/.test(code) || Number(code) === 0 || !department || !subDepartment) {
-    return { error: `${PRODUCT_TYPE_LABELS[productType]}: צריך קוד מספרי, מחלקה ותת מחלקה.` };
-  }
-  const { error } = await supabase.from("departments").upsert({
+  const supabase = await createClient();
+  const { error } = await supabase.from("pos_departments").insert({
     business_id: active.businessId,
-    product_type: productType,
-    code: Number(code),
-    department,
-    sub_department: subDepartment,
+    code,
+    department: field("department"),
+    sub_department: field("sub_department"),
+    item_name: field("item_name") || null,
   });
   if (error) {
-    return { error: catalogErrorMessage(error) };
+    return {
+      error: error.code === "23505" ? "כבר קיימת מחלקה עם הקוד הזה." : catalogErrorMessage(error),
+    };
   }
   revalidatePath("/settings");
-  return { ok: "נשמר." };
+  revalidatePath("/receiving/[id]/export", "page");
+  return { ok: `המחלקה ${code} נוספה.` };
 }
 
-/** Adds the departments seen in the POS sample file; existing entries are kept. */
-export async function fillSampleDepartments(): Promise<FormState> {
+export async function deletePosDepartment(_: FormState, formData: FormData): Promise<FormState> {
   const { active } = await requireBusiness();
   const supabase = await createClient();
-  const { error } = await supabase.from("departments").upsert(
-    SAMPLE_DEPARTMENTS.map((row) => ({ business_id: active.businessId, ...row })),
-    { onConflict: "business_id,product_type", ignoreDuplicates: true },
-  );
+  const { data, error } = await supabase
+    .from("pos_departments")
+    .delete()
+    .eq("id", String(formData.get("department_id") ?? ""))
+    .eq("business_id", active.businessId)
+    .select("id");
   if (error) {
     return { error: catalogErrorMessage(error) };
   }
+  if (data.length === 0) {
+    return { error: "רק בעלים או מנהל יכולים לשנות מחלקות." };
+  }
   revalidatePath("/settings");
-  return { ok: "נוספו המחלקות מקובץ הדוגמה." };
+  return null;
 }

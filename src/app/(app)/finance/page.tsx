@@ -29,7 +29,7 @@ import {
 import { ActionForm } from "@/components/action-form";
 import { createFinanceAccount, createLedgerEntry, deleteLedgerEntry, markLedgerPaid } from "./actions";
 
-export const metadata: Metadata = { title: "הנהלת חשבונות וחשבונות" };
+export const metadata: Metadata = { title: "יומן כספים" };
 
 const STATUS_BADGES = {
   draft: "bg-surface-subtle text-muted",
@@ -93,10 +93,7 @@ export default async function FinancePage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-extrabold tracking-tight">הנהלת חשבונות וחשבונות</h1>
-          <p className="mt-0.5 text-sm text-muted">חשבונות בנק וסליקה, הכנסות והוצאות, מע״מ וריכוז לרואה החשבון</p>
-        </div>
+        <h1 className="text-3xl sm:text-4xl">יומן כספים</h1>
         <Link href="/integrations" className="btn-quiet min-h-9 px-3 text-xs">
           <PlugZap className="size-3.5 text-accent" aria-hidden />
           <span>
@@ -221,7 +218,7 @@ export default async function FinancePage() {
         </div>
         {accounts.length === 0 ? (
           <p className="rounded-xl bg-surface-subtle/60 px-4 py-3 text-sm text-muted">
-            עוד לא הוגדרו חשבונות. הוסיפו חשבון בנק, מסוף סליקה או קופה לניהול התזרים.
+            עוד אין חשבונות.
           </p>
         ) : (
           <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">

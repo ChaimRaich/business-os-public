@@ -20,7 +20,7 @@ const STAGE_BADGES: Record<CustomerStage, string> = {
   lead: "bg-warning-soft text-warning",
   prospect: "bg-surface-subtle text-ink",
   active: "bg-accent-soft text-accent-strong",
-  vip: "bg-accent text-white dark:text-[#041815]",
+  vip: "bg-accent text-(--btn-fg)",
   inactive: "bg-surface-subtle text-muted",
 };
 
@@ -54,7 +54,7 @@ export function CrmDirectory({ customers, canDelete }: { customers: CustomerRow[
             onClick={() => setStageFilter("all")}
             className={`cursor-pointer rounded-full px-3 py-1.5 text-xs font-semibold transition-all ${
               stageFilter === "all"
-                ? "bg-accent text-white dark:text-[#041815]"
+                ? "bg-accent text-(--btn-fg)"
                 : "border border-line bg-surface-subtle/50 text-muted hover:text-ink"
             }`}
           >
@@ -70,7 +70,7 @@ export function CrmDirectory({ customers, canDelete }: { customers: CustomerRow[
                 onClick={() => setStageFilter(stage)}
                 className={`cursor-pointer rounded-full px-3 py-1.5 text-xs font-semibold transition-all ${
                   active
-                    ? "bg-accent text-white dark:text-[#041815]"
+                    ? "bg-accent text-(--btn-fg)"
                     : "border border-line bg-surface-subtle/50 text-muted hover:text-ink"
                 }`}
               >
@@ -110,7 +110,7 @@ export function CrmDirectory({ customers, canDelete }: { customers: CustomerRow[
           </p>
           <p className="mt-1 text-xs text-muted">
             {customers.length === 0
-              ? "הוסיפו את איש הקשר הראשון למעלה כדי להתחיל לנהל קשרי לקוחות."
+              ? "הוסיפו את הראשון למעלה."
               : "נסו להחליף שלב או לנקות את שדה החיפוש."}
           </p>
         </div>

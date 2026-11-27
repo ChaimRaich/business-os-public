@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireBusiness } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -45,7 +46,7 @@ export async function saveIntegration(_state: FormState, formData: FormData): Pr
   }
 
   if (mode === "live" && !account_ref && !api_key) {
-    return { error: "בחיבור חי יש להזין לפחות מזהה חשבון או מפתח API (או לבחור מצב Sandbox / ידני)." };
+    return { error: "בחיבור חי יש להזין לפחות מזהה חשבון או מפתח API או לבחור מצב ידני." };
   }
 
   const supabase = await createClient();
@@ -82,7 +83,7 @@ export async function saveIntegration(_state: FormState, formData: FormData): Pr
 
   revalidatePath("/", "layout");
   revalidatePath("/integrations");
-  return { ok: mode === "live" ? `${providerMeta.name} חובר בהצלחה.` : `${providerMeta.name} הוגדר במצב Sandbox / ידני.` };
+  return { ok: mode === "live" ? `${providerMeta.name} חובר בהצלחה.` : `${providerMeta.name} הוגדר במצב ידני.` };
 }
 
 export async function syncIntegration(_state: FormState, formData: FormData): Promise<FormState> {
@@ -111,24 +112,21 @@ export async function syncIntegration(_state: FormState, formData: FormData): Pr
   return { ok: "הסנכרון הושלם." };
 }
 
+/** Marks the optional setup wizard as finished (or skipped) so the reminder stops showing. */
 export async function completeOnboarding(): Promise<FormState> {
   const { active } = await requireBusiness();
   if (!can(active.role, "integrations.manage")) {
-    return { error: "רק בעלים או מנהל יכולים להשלים את אתחול העסק." };
+    return { error: "רק בעלים או מנהל יכולים לסיים את הקמת העסק." };
   }
 
   const supabase = await createClient();
   const { error } = await supabase.rpc("complete_business_onboarding", {
     p_business_id: active.businessId,
   });
-
   if (error) {
-    if (error.message.includes("integrations_incomplete")) {
-      return { error: "יש להגדיר את כל 4 קטגוריות האינטגרציה לפני הכניסה למערכת." };
-    }
-    return { error: "השלמת האתחול נכשלה. נסו שוב." };
+    return { error: "שמירת סיום ההקמה נכשלה. נסו שוב." };
   }
 
   revalidatePath("/", "layout");
-  return { ok: "האתחול הושלם! מעביר לסביבת העבודה…" };
+  redirect("/integrations");
 }

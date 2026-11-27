@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
 import { requireBusiness } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { ReceivingSteps } from "@/components/receiving-steps";
 import { UploadForm } from "@/components/upload-form";
 
 export const metadata: Metadata = { title: "קליטה חדשה" };
@@ -22,13 +22,12 @@ export default async function NewReceivingPage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <Link href="/receiving" className="back-link">
-          <ArrowRight className="size-4" aria-hidden />
-          <span>כל הקליטות</span>
+        <Link href="/receiving" className="text-sm text-muted underline-offset-4 hover:underline">
+          → כל הקליטות
         </Link>
-        <h1 className="mt-2 text-2xl font-extrabold tracking-tight">קליטה חדשה</h1>
-        <p className="mt-0.5 text-sm text-muted">בחרו מחסן והעלו צילום או PDF של החשבונית / תעודת המשלוח</p>
+        <h1 className="mt-1 text-3xl sm:text-4xl">קליטה חדשה</h1>
       </div>
+      <ReceivingSteps current={0} />
       <UploadForm businessId={active.businessId} warehouses={warehouses} />
     </div>
   );

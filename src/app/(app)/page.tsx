@@ -1,522 +1,255 @@
+import { Suspense } from "react";
 import Link from "next/link";
-import {
-  ArrowUpLeft,
-  BarChart3,
-  Building2,
-  CheckCircle2,
-  FileUp,
-  Landmark,
-  Megaphone,
-  Package,
-  PlugZap,
-  Plus,
-  Sparkles,
-  TrendingUp,
-  Users,
-} from "lucide-react";
+import { LandingSections } from "@/components/landing";
+import { RotatingText, SectionDots } from "@/components/motion";
 import { requireBusiness } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { ROLE_LABELS } from "@/lib/permissions";
-import { DOCUMENT_STATUS_LABELS, DOCUMENT_TYPE_LABELS } from "@/lib/documents";
-import { INTEGRATION_CATEGORIES, isIntegrationReady } from "@/lib/integrations";
-import { CUSTOMER_STAGE_LABELS, formatCurrency } from "@/lib/suite";
+import { can, ROLE_LABELS } from "@/lib/permissions";
+import { formatAmount } from "@/lib/documents";
+import { loadAccounting, openPayables, todayInIsrael } from "@/lib/accounting";
+import { addDays } from "@/lib/campaigns";
+import { loadInitiatives, type Initiative } from "@/lib/initiatives";
+import Loading from "./loading";
 
-const STATUS_BADGES = {
-  uploaded: "bg-surface-subtle text-muted",
-  extracting: "bg-surface-subtle text-muted",
-  review: "bg-warning-soft text-warning",
-  failed: "bg-danger-soft text-danger",
-  approved: "bg-accent-soft text-accent-strong",
-} as const;
+type Task = { href: string; text: string; urgent?: boolean };
+type Area = {
+  href: string;
+  title: string;
+  /** File name of the small 3D picture in public/icons/3d. */
+  icon: string;
+  figures: { label: string; value: string }[];
+  tasks: Task[];
+  action: { href: string; label: string };
+};
 
-export default async function HomePage() {
-  const { user, active } = await requireBusiness();
+// The home screen has no folder of its own for a loading file, so its boundary is here:
+// without one, coming back to it from another screen would wait with nothing shown.
+export default function HomePage() {
+  return (
+    <Suspense fallback={<Loading />}>
+      <Hub />
+    </Suspense>
+  );
+}
+
+const INITIATIVE_LOOK: Record<Initiative["kind"], { label: string; glyph: string; tone: string }> = {
+  reorder: { label: "מלאי", glyph: "↓", tone: "var(--tone-a)" },
+  promotion: { label: "קמפיינים", glyph: "✦", tone: "var(--tone-b)" },
+  accountant: { label: "ראיית חשבון", glyph: "₪", tone: "var(--tone-c)" },
+};
+
+/** The hub: what the system started on its own, then one card per area with what is waiting in it. */
+async function Hub() {
+  const { active } = await requireBusiness();
   const supabase = await createClient();
+  const today = todayInIsrael();
+  const business = active.businessId;
+  const head = { count: "exact", head: true } as const;
+  const seesMoney = can(active.role, "accounting.view");
 
-  const count = async (table: "products" | "documents") => {
-    const { count: total, error } = await supabase
-      .from(table)
-      .select("id", { count: "exact", head: true })
-      .eq("business_id", active.businessId);
-    if (error) {
-      throw new Error(`Failed to count ${table}: ${error.message}`);
-    }
-    return total ?? 0;
-  };
+  const shortage = (state: string) =>
+    supabase.rpc("stock_overview", { p_business_id: business }, head).eq("state", state);
+  const [stockOut, stockLow, stockNegative] = await Promise.all([shortage("out"), shortage("low"), shortage("negative")]);
 
-  const [
-    products,
-    documentsCount,
-    recentResult,
-    accountsResult,
-    ledgerResult,
-    campaignsResult,
-    customersResult,
-    integrationsResult,
-  ] = await Promise.all([
-    count("products"),
-    count("documents"),
-    supabase
-      .from("documents")
-      .select("id, status, doc_type, doc_number, supplier_name_raw, created_at, suppliers (name)")
-      .eq("business_id", active.businessId)
-      .order("created_at", { ascending: false })
-      .limit(5),
-    supabase.from("finance_accounts").select("balance").eq("business_id", active.businessId),
-    supabase.from("ledger_entries").select("kind, status, amount").eq("business_id", active.businessId),
-    supabase.from("campaigns").select("status, budget, spent, leads_count, revenue").eq("business_id", active.businessId),
-    supabase.from("customers").select("stage, lifetime_value").eq("business_id", active.businessId),
-    supabase
-      .from("business_integrations")
-      .select("category, display_name, status")
-      .eq("business_id", active.businessId),
+  const [products, review, approved, tillProblems, unmatched, activeCampaigns, postsWaiting, postsLate, accounting] = await Promise.all([
+    supabase.from("products").select("id", head).eq("business_id", business),
+    supabase.from("documents").select("id", head).eq("business_id", business).in("status", ["review", "failed"]),
+    supabase.from("documents").select("id, pos_exports (id)").eq("business_id", business).eq("status", "approved").limit(500),
+    supabase.from("pos_exports").select("id", head).eq("business_id", business).is("confirmed_at", null).not("problem_at", "is", null),
+    supabase.from("sales_lines").select("id", head).eq("business_id", business).is("applied_at", null),
+    supabase.from("campaigns").select("id", head).eq("business_id", business).lte("starts_on", today).gte("ends_on", today),
+    supabase.from("campaign_posts").select("id", head).eq("business_id", business).is("published_at", null).gte("scheduled_for", today).lte("scheduled_for", addDays(today, 7)),
+    supabase.from("campaign_posts").select("id", head).eq("business_id", business).is("published_at", null).lt("scheduled_for", today),
+    seesMoney ? loadAccounting(supabase, business) : null,
   ]);
+  const failed = [products, review, approved, tillProblems, unmatched, activeCampaigns, postsWaiting, postsLate, stockOut, stockLow, stockNegative].find((result) => result.error);
+  if (failed?.error) {
+    throw new Error(`Failed to load the home screen: ${failed.error.message}`);
+  }
+  const initiatives = await loadInitiatives(supabase, business, today, accounting);
+  const withoutFile = (approved.data ?? []).filter((document) => document.pos_exports.length === 0).length;
+  const plural = (count: number, one: string, many: string) => (count === 1 ? one : `${count} ${many}`);
 
-  if (
-    recentResult.error ||
-    accountsResult.error ||
-    ledgerResult.error ||
-    campaignsResult.error ||
-    customersResult.error ||
-    integrationsResult.error
-  ) {
-    throw new Error(
-      `Failed to load dashboard: ${(
-        recentResult.error ??
-        accountsResult.error ??
-        ledgerResult.error ??
-        campaignsResult.error ??
-        customersResult.error ??
-        integrationsResult.error
-      )!.message}`,
-    );
+  const stockTasks: Task[] = [
+    review.count ? { href: "/receiving", text: plural(review.count, "מסמך אחד מחכה לבדיקה ולאישור", "מסמכים מחכים לבדיקה ולאישור") } : null,
+    withoutFile ? { href: "/exports", text: plural(withoutFile, "קליטה אחת עוד בלי קובץ לקופה", "קליטות עוד בלי קובץ לקופה") } : null,
+    tillProblems.count ? { href: "/exports", text: plural(tillProblems.count, "קובץ אחד שהקופה לא קיבלה", "קבצים שהקופה לא קיבלה"), urgent: true } : null,
+    unmatched.count ? { href: "/sales", text: plural(unmatched.count, "שורת מכירה אחת שלא זוהתה בקטלוג", "שורות מכירה שלא זוהו בקטלוג"), urgent: true } : null,
+    stockNegative.count ? { href: "/reports/stock", text: plural(stockNegative.count, "פריט אחד שהמלאי שלו במינוס", "פריטים שהמלאי שלהם במינוס"), urgent: true } : null,
+    stockOut.count ? { href: "/reports/stock", text: plural(stockOut.count, "פריט אחד אזל מהמלאי", "פריטים אזלו מהמלאי") } : null,
+    stockLow.count ? { href: "/reports/stock", text: plural(stockLow.count, "פריט אחד מתחת לסף החוסר", "פריטים מתחת לסף החוסר") } : null,
+  ].filter((task) => task !== null);
+
+  const campaignTasks: Task[] = [
+    postsLate.count ? { href: "/campaigns", text: plural(postsLate.count, "פוסט אחד שהתאריך שלו עבר ולא פורסם", "פוסטים שהתאריך שלהם עבר ולא פורסמו"), urgent: true } : null,
+    postsWaiting.count ? { href: "/campaigns", text: plural(postsWaiting.count, "פוסט אחד לפרסום בשבוע הקרוב", "פוסטים לפרסום בשבוע הקרוב") } : null,
+  ].filter((task) => task !== null);
+
+  const areas: Area[] = [
+    {
+      href: "/products",
+      title: "מלאי",
+      icon: "package",
+      figures: [{ label: "מוצרים בקטלוג", value: String(products.count ?? 0) }],
+      tasks: stockTasks,
+      action: { href: "/receiving/new", label: "קליטת סחורה" },
+    },
+    {
+      href: "/campaigns",
+      title: "קמפיינים",
+      icon: "megaphone",
+      figures: [{ label: "קמפיינים פעילים עכשיו", value: String(activeCampaigns.count ?? 0) }],
+      tasks: campaignTasks,
+      action: { href: "/campaigns", label: "לקמפיינים" },
+    },
+  ];
+  if (accounting) {
+    const open = openPayables(accounting.purchases, accounting.expenses, today);
+    areas.push({
+      href: "/accounting",
+      title: "ראיית חשבון",
+      icon: "receipt",
+      figures: [{ label: "פתוח לתשלום", value: `${formatAmount(open.total, 0)} ₪` }],
+      tasks: [
+        open.overdue ? { href: "/accounting", text: plural(open.overdue, "תשלום אחד באיחור", "תשלומים באיחור"), urgent: true } : null,
+        open.count ? { href: "/accounting", text: plural(open.count, "מסמך אחד שעוד לא שולם", "מסמכים שעוד לא שולמו") } : null,
+      ].filter((task) => task !== null),
+      action: { href: "/accounting", label: "לראיית החשבון" },
+    });
   }
 
-  const recentDocuments = recentResult.data;
-  const pendingReview = recentDocuments.filter((doc) => doc.status === "review").length;
-  const totalBalance = accountsResult.data.reduce((sum, row) => sum + Number(row.balance), 0);
-
-  const ledgerIncome = ledgerResult.data
-    .filter((e) => e.kind === "income" || e.kind === "invoice")
-    .reduce((sum, e) => sum + Number(e.amount), 0);
-  const ledgerExpense = ledgerResult.data
-    .filter((e) => e.kind === "expense" || e.kind === "tax_payment")
-    .reduce((sum, e) => sum + Number(e.amount), 0);
-  const cashflowMax = Math.max(ledgerIncome, ledgerExpense, 1);
-
-  const campaigns = campaignsResult.data;
-  const activeCampaigns = campaigns.filter((c) => c.status === "active").length;
-  const campaignBudget = campaigns.reduce((sum, c) => sum + Number(c.budget), 0);
-  const campaignSpent = campaigns.reduce((sum, c) => sum + Number(c.spent), 0);
-  const campaignRevenue = campaigns.reduce((sum, c) => sum + Number(c.revenue), 0);
-  const campaignRoas = campaignSpent > 0 ? campaignRevenue / campaignSpent : 0;
-
-  const customers = customersResult.data;
-  const stageCounts = {
-    lead: customers.filter((c) => c.stage === "lead").length,
-    prospect: customers.filter((c) => c.stage === "prospect").length,
-    active: customers.filter((c) => c.stage === "active").length,
-    vip: customers.filter((c) => c.stage === "vip").length,
-  };
-  const funnelMax = Math.max(stageCounts.lead, stageCounts.prospect, stageCounts.active, stageCounts.vip, 1);
-
-  const integrationsByCategory = new Map(integrationsResult.data.map((i) => [i.category, i]));
-  const connectedCount = INTEGRATION_CATEGORIES.filter((c) =>
-    isIntegrationReady(integrationsByCategory.get(c.id)?.status),
-  ).length;
-  const dateFormatter = new Intl.DateTimeFormat("he-IL", { dateStyle: "short", timeZone: "Asia/Jerusalem" });
-
-  const stats = [
-    { href: "/products", label: "מוצרים בקטלוג", value: String(products), icon: Package },
-    {
-      href: "/receiving",
-      label: "קליטות סחורה",
-      value: String(documentsCount),
-      icon: FileUp,
-      note: pendingReview > 0 ? `${pendingReview} ממתינות לאימות` : undefined,
-    },
-    {
-      href: "/finance",
-      label: "יתרת חשבונות",
-      value: formatCurrency(totalBalance),
-      icon: Landmark,
-      ltr: true,
-    },
-    {
-      href: "/campaigns",
-      label: "קמפיינים ולקוחות",
-      value: `${campaigns.length} / ${customers.length}`,
-      icon: Megaphone,
-      note: activeCampaigns > 0 ? `${activeCampaigns} קמפיינים פעילים` : "קמפיינים · CRM",
-    },
-  ];
-
-  const quickActions = [
-    {
-      href: "/receiving/new",
-      title: "קליטת סחורה חדשה",
-      description: "צלמו תעודת משלוח או העלו PDF לקריאה אוטומטית וייצוא לקופה",
-      icon: FileUp,
-      featured: true,
-    },
-    {
-      href: "/finance",
-      title: "הנהלת חשבונות וחשבונות",
-      description: "חשבונות בנק, סליקה, הוצאות, הכנסות וריכוז מע״מ לרו״ח",
-      icon: Landmark,
-    },
-    {
-      href: "/campaigns",
-      title: "קמפיינים ושיווק",
-      description: "ניהול קמפייני Meta / Google / WhatsApp, תקציב ו-ROAS",
-      icon: Megaphone,
-    },
-    {
-      href: "/crm",
-      title: "לקוחות ו-CRM",
-      description: "ניהול לידים, שלבי מכירה ומועדון לקוחות VIP",
-      icon: Users,
-    },
-  ];
+  const waiting = areas.reduce((total, area) => total + area.tasks.length, 0);
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* Executive Welcome Hero */}
-      <section className="card relative overflow-hidden p-5 sm:p-6">
-        <div
-          className="pointer-events-none absolute inset-0 opacity-60 dark:opacity-35"
-          style={{
-            backgroundImage:
-              "radial-gradient(circle at 8% 15%, color-mix(in srgb, var(--bos-accent) 18%, transparent), transparent 46%)",
-          }}
-          aria-hidden
-        />
-        <div className="relative flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <div className="mb-2.5 flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface/90 px-3 py-1 text-xs font-medium text-muted">
-                <Building2 className="size-3.5 text-accent" aria-hidden />
-                <span>{ROLE_LABELS[active.role]}</span>
-                <span className="text-line-strong">·</span>
-                <bdi dir="ltr">{user.email}</bdi>
-              </span>
-              <Link
-                href="/integrations"
-                className="inline-flex items-center gap-1.5 rounded-full border border-accent/25 bg-accent-soft px-3 py-1 text-xs font-semibold text-accent-strong transition-opacity hover:opacity-90"
-              >
-                <span className="status-dot animate-pulse" aria-hidden />
-                <span>{connectedCount}/{INTEGRATION_CATEGORIES.length} אינטגרציות פעילות</span>
+    <div className="flex flex-col gap-12">
+      <section className="bleed hero frame-row -mt-8 py-12 text-center sm:-mt-10 sm:py-16" data-fx suppressHydrationWarning>
+        <div className="fx-hero"><div className="hero-in">
+        <span className="pill">
+          <bdi>{active.businessName}</bdi>
+          <span aria-hidden="true">·</span>
+          {ROLE_LABELS[active.role]}
+        </span>
+        <h1 className="hero-title mx-auto mt-5 max-w-3xl">
+          עסק שמפעיל את עצמו.
+          <br />
+          <RotatingText phrases={["מזמין מה שחסר.", "יוזם מבצעים.", "סוגר את החודש.", "אתם רק מאשרים."]} />
+        </h1>
+        <p className="lede mx-auto mt-6 max-w-xl">
+          {initiatives.length > 0
+            ? `המערכת הכינה ${initiatives.length === 1 ? "יוזמה אחת" : `${initiatives.length} יוזמות`}. נשאר לכם לבדוק ולאשר.`
+            : waiting === 0
+              ? "אין כרגע דבר שמחכה לטיפול."
+              : "זה מה שמחכה לטיפול היום."}
+        </p>
+        <div className="mt-8 flex flex-wrap justify-center gap-3">
+          {initiatives.length > 0 ? (
+            <>
+              <a href="#initiatives" className="btn btn-lg">
+                ליוזמות שמחכות לאישור
+              </a>
+              <Link href="/receiving/new" className="btn-quiet btn-lg">
+                קליטת סחורה
               </Link>
-            </div>
-            <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">{active.businessName}</h1>
-            <p className="mt-1 text-sm text-muted">
-              מרכז השליטה העסקי — מלאי, כספים, שיווק ולקוחות בתצוגה אחת.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2.5">
-            <Link href="/integrations" className="btn-quiet">
-              <PlugZap className="size-4 text-accent" aria-hidden />
-              <span>אינטגרציות</span>
-            </Link>
-            <Link href="/receiving/new" className="btn">
-              <Plus className="size-4" aria-hidden />
-              <span>קליטה חדשה</span>
-            </Link>
-          </div>
+            </>
+          ) : (
+            <>
+              <Link href="/receiving/new" className="btn btn-lg">
+                קליטת סחורה
+              </Link>
+              <Link href="/campaigns" className="btn-quiet btn-lg">
+                קמפיינים
+              </Link>
+            </>
+          )}
         </div>
+        </div></div>
+      </section>
 
-        {/* Connected systems strip */}
-        <div className="relative mt-5 grid grid-cols-2 gap-2.5 border-t border-line/80 pt-4 lg:grid-cols-4">
-          {INTEGRATION_CATEGORIES.map((category) => {
-            const row = integrationsByCategory.get(category.id);
-            const ready = isIntegrationReady(row?.status);
-            return (
-              <Link
-                key={category.id}
-                href="/integrations"
-                className="flex items-center gap-2.5 rounded-xl border border-line/80 bg-surface-subtle/50 px-3 py-2 transition-colors hover:border-accent/50 hover:bg-surface"
-              >
-                <CheckCircle2
-                  className={`size-4 shrink-0 ${ready ? "text-accent" : "text-muted/50"}`}
-                  aria-hidden
-                />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[11px] text-muted">{category.shortTitle}</span>
-                  <span className="block truncate text-xs font-bold text-ink">
-                    {row?.display_name ?? "לא מחובר"}
-                  </span>
-                </span>
+      <section id="initiatives" className="scroll-mt-28" aria-labelledby="initiatives-heading">
+        <p className="eyebrow">המערכת יזמה</p>
+        <h2 id="initiatives-heading" className="mt-2 text-3xl">
+          {initiatives.length > 0 ? "מוכן לאישור שלכם" : "אין כרגע יוזמה חדשה"}
+        </h2>
+        {initiatives.length === 0 ? (
+          <p className="mt-3 max-w-prose text-sm text-muted">
+            בכל כניסה המערכת בודקת שלושה דברים: פריטים שירדו מתחת לסף המלאי, מוצרים שנמצאים במלאי ולא נמכרו 30 יום, וחודש
+            שנסגר ומחכה לרואה החשבון. כשאחד מהם קורה, הצעד הבא יופיע כאן מוכן.
+          </p>
+        ) : (
+          <ul className={`mt-6 grid gap-3 ${initiatives.length >= 3 ? "lg:grid-cols-3" : "sm:grid-cols-2"}`}>
+            {initiatives.map((initiative) => {
+              const look = INITIATIVE_LOOK[initiative.kind];
+              return (
+                <li key={initiative.href} className="card reveal flex flex-col gap-3" suppressHydrationWarning>
+                  <p className="flex items-center gap-2 text-sm text-muted">
+                    <span className="glyph" style={{ "--glyph": look.tone } as React.CSSProperties} aria-hidden="true">
+                      {look.glyph}
+                    </span>
+                    {look.label}
+                  </p>
+                  <h3 className="display text-xl">
+                    <bdi>{initiative.title}</bdi>
+                  </h3>
+                  <p className="text-sm leading-relaxed text-muted">
+                    <bdi>{initiative.reason}</bdi>
+                  </p>
+                  <Link href={initiative.href} className="btn mt-auto self-start">
+                    {initiative.action}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        <p className="mt-4 text-xs text-muted">המערכת מכינה ומציעה. שום דבר לא נשלח, לא מתפרסם ולא מוזמן בלי האישור שלכם.</p>
+      </section>
+
+      <section aria-labelledby="areas-heading">
+        <p className="eyebrow">העסק שלכם</p>
+        <h2 id="areas-heading" className="mt-2 text-3xl">
+          מה מחכה לטיפול
+        </h2>
+        <div className={`mt-6 grid gap-3 ${areas.length === 3 ? "lg:grid-cols-3" : "sm:grid-cols-2"}`}>
+          {areas.map((area) => (
+            <section key={area.href} className="card reveal flex flex-col gap-4" suppressHydrationWarning aria-labelledby={`area-${area.href.slice(1)}`}>
+              <div className="flex items-center justify-between gap-3">
+                <h3 id={`area-${area.href.slice(1)}`} className="eyebrow">
+                  <Link href={area.href} className="hover:text-accent">{area.title}</Link>
+                </h3>
+                {/* eslint-disable-next-line @next/next/no-img-element -- a 4 KB decorative picture, already sized */}
+                <img src={`/icons/3d/${area.icon}.webp`} alt="" width={44} height={44} className="icon-3d" />
+              </div>
+              {area.figures.map((figure) => (
+                <p key={figure.label}>
+                  <bdi dir="ltr" className="display block text-5xl tabular-nums">{figure.value}</bdi>
+                  <span className="mt-1 block text-sm text-muted">{figure.label}</span>
+                </p>
+              ))}
+              {area.tasks.length === 0 ? (
+                <p className="text-sm text-muted">הכול מטופל.</p>
+              ) : (
+                <ul className="flex flex-col gap-1.5 text-sm">
+                  {area.tasks.map((task) => (
+                    <li key={task.text}>
+                      <Link href={task.href} className={`flex min-h-11 items-center rounded-lg px-3 hover:underline ${task.urgent ? "bg-danger-soft text-danger" : "bg-warn-soft text-warn"}`}>
+                        {task.text}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <Link href={area.action.href} className="btn-quiet mt-auto self-start">
+                {area.action.label}
               </Link>
-            );
-          })}
+            </section>
+          ))}
         </div>
       </section>
 
-      {/* KPI Grid */}
-      <div className="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
-        {stats.map((stat) => {
-          const Icon = stat.icon;
-          return (
-            <Link
-              key={stat.href}
-              href={stat.href}
-              className="card-interactive group flex flex-col justify-between gap-4 p-4 sm:p-5"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className="icon-box transition-transform group-hover:scale-105">
-                  <Icon className="size-4.5" aria-hidden />
-                </span>
-                <ArrowUpLeft
-                  className="size-4 text-muted/60 transition-all group-hover:-translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-accent"
-                  aria-hidden
-                />
-              </div>
-              <div>
-                <bdi
-                  dir={stat.ltr ? "ltr" : "auto"}
-                  className="block text-right text-2xl font-extrabold tracking-tight tabular-nums text-ink sm:text-3xl"
-                >
-                  {stat.value}
-                </bdi>
-                <span className="mt-0.5 block text-sm font-medium text-muted">{stat.label}</span>
-                {stat.note && (
-                  <span className="mt-2 inline-flex rounded-full bg-surface-subtle px-2.5 py-0.5 text-[11px] font-semibold text-muted">
-                    {stat.note}
-                  </span>
-                )}
-              </div>
-            </Link>
-          );
-        })}
+      <div className="-mb-8 sm:-mb-10">
+        <LandingSections cta={{ href: "/receiving/new", label: "קליטת סחורה" }} />
       </div>
-
-      {/* Visual Business Pulse: Finance, Campaigns, CRM */}
-      <div className="grid gap-4 lg:grid-cols-3">
-        {/* Finance Pulse */}
-        <section className="card flex flex-col justify-between gap-4 p-5">
-          <div className="flex items-center justify-between">
-            <h2 className="flex items-center gap-2 text-sm font-bold text-ink">
-              <BarChart3 className="size-4 text-accent" aria-hidden />
-              <span>תזרים והנה״ח</span>
-            </h2>
-            <Link href="/finance" className="text-xs font-semibold text-accent hover:underline">
-              למסך כספים
-            </Link>
-          </div>
-          <div className="flex flex-col gap-3">
-            <div>
-              <div className="mb-1 flex items-center justify-between text-xs">
-                <span className="text-muted">הכנסות וחשבוניות</span>
-                <bdi dir="ltr" className="font-bold tabular-nums text-accent-strong">{formatCurrency(ledgerIncome)}</bdi>
-              </div>
-              <div className="h-2 overflow-hidden rounded-full bg-surface-subtle">
-                <div
-                  className="h-full rounded-full bg-accent transition-all duration-500"
-                  style={{ width: `${ledgerIncome > 0 ? Math.max(8, Math.round((ledgerIncome / cashflowMax) * 100)) : 0}%` }}
-                />
-              </div>
-            </div>
-            <div>
-              <div className="mb-1 flex items-center justify-between text-xs">
-                <span className="text-muted">הוצאות ותשלומי מס</span>
-                <bdi dir="ltr" className="font-bold tabular-nums text-ink">{formatCurrency(ledgerExpense)}</bdi>
-              </div>
-              <div className="h-2 overflow-hidden rounded-full bg-surface-subtle">
-                <div
-                  className="h-full rounded-full bg-danger/80 transition-all duration-500"
-                  style={{ width: `${ledgerExpense > 0 ? Math.max(8, Math.round((ledgerExpense / cashflowMax) * 100)) : 0}%` }}
-                />
-              </div>
-            </div>
-          </div>
-          <p className="border-t border-line pt-3 text-xs text-muted">
-            נטו תפעולי:{" "}
-            <bdi dir="ltr" className={`font-bold tabular-nums ${ledgerIncome - ledgerExpense >= 0 ? "text-accent-strong" : "text-danger"}`}>
-              {formatCurrency(ledgerIncome - ledgerExpense)}
-            </bdi>
-          </p>
-        </section>
-
-        {/* Campaigns Pulse */}
-        <section className="card flex flex-col justify-between gap-4 p-5">
-          <div className="flex items-center justify-between">
-            <h2 className="flex items-center gap-2 text-sm font-bold text-ink">
-              <TrendingUp className="size-4 text-accent" aria-hidden />
-              <span>ביצועי קמפיינים</span>
-            </h2>
-            <Link href="/campaigns" className="text-xs font-semibold text-accent hover:underline">
-              לקמפיינים
-            </Link>
-          </div>
-          <div className="flex items-baseline justify-between gap-2">
-            <div>
-              <span className="block text-xs text-muted">החזר השקעה (ROAS)</span>
-              <span className="mt-0.5 block text-2xl font-extrabold tabular-nums text-accent-strong">
-                {campaignRoas > 0 ? `${campaignRoas.toFixed(1)}x` : "—"}
-              </span>
-            </div>
-            <div className="text-left">
-              <span className="block text-xs text-muted">הכנסות מיוחסות</span>
-              <bdi dir="ltr" className="mt-0.5 block text-sm font-bold tabular-nums text-ink">
-                {formatCurrency(campaignRevenue)}
-              </bdi>
-            </div>
-          </div>
-          <div>
-            <div className="mb-1 flex items-center justify-between text-xs text-muted">
-              <span>ניצול תקציב פרסום</span>
-              <span className="tabular-nums">
-                {campaignBudget > 0 ? `${Math.min(100, Math.round((campaignSpent / campaignBudget) * 100))}%` : "0%"}
-              </span>
-            </div>
-            <div className="h-2 overflow-hidden rounded-full bg-surface-subtle">
-              <div
-                className="h-full rounded-full bg-accent transition-all duration-500"
-                style={{ width: `${campaignBudget > 0 ? Math.min(100, Math.round((campaignSpent / campaignBudget) * 100)) : 0}%` }}
-              />
-            </div>
-          </div>
-        </section>
-
-        {/* CRM Funnel Pulse */}
-        <section className="card flex flex-col justify-between gap-4 p-5">
-          <div className="flex items-center justify-between">
-            <h2 className="flex items-center gap-2 text-sm font-bold text-ink">
-              <Users className="size-4 text-accent" aria-hidden />
-              <span>משפך לקוחות (CRM)</span>
-            </h2>
-            <Link href="/crm" className="text-xs font-semibold text-accent hover:underline">
-              ל-CRM
-            </Link>
-          </div>
-          <div className="flex flex-col gap-2">
-            {(["lead", "prospect", "active", "vip"] as const).map((stage) => {
-              const value = stageCounts[stage];
-              const pct = value > 0 ? Math.max(10, Math.round((value / funnelMax) * 100)) : 0;
-              return (
-                <div key={stage} className="flex items-center gap-2.5 text-xs">
-                  <span className="w-20 shrink-0 truncate text-muted">{CUSTOMER_STAGE_LABELS[stage]}</span>
-                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-surface-subtle">
-                    <div
-                      className={`h-full rounded-full transition-all duration-500 ${
-                        stage === "vip" ? "bg-accent" : stage === "active" ? "bg-accent/75" : stage === "lead" ? "bg-warning" : "bg-muted/60"
-                      }`}
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                  <span className="w-6 text-left font-bold tabular-nums text-ink">{value}</span>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      </div>
-
-      {/* Main two-column workspace */}
-      <div className="grid gap-6 lg:grid-cols-12">
-        {/* Quick Actions */}
-        <section className="card lg:col-span-7">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="section-heading">
-              <Sparkles className="size-4.5 text-accent" aria-hidden />
-              <span>פעולות מהירות</span>
-            </h2>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {quickActions.map((action) => {
-              const Icon = action.icon;
-              return (
-                <Link
-                  key={action.href}
-                  href={action.href}
-                  className={`group flex flex-col gap-2 rounded-xl border p-4 transition-all hover:-translate-y-0.5 ${
-                    action.featured
-                      ? "border-accent/35 bg-accent-soft/50 hover:border-accent"
-                      : "border-line bg-surface-subtle/40 hover:border-line-strong hover:bg-surface-subtle"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span
-                      className={`inline-flex size-9 items-center justify-center rounded-xl ${
-                        action.featured
-                          ? "bg-accent text-white dark:text-[#041815]"
-                          : "bg-surface text-accent shadow-xs"
-                      }`}
-                    >
-                      <Icon className="size-4.5" aria-hidden />
-                    </span>
-                    <ArrowUpLeft
-                      className="size-4 text-muted transition-transform group-hover:-translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-accent"
-                      aria-hidden
-                    />
-                  </div>
-                  <p className="mt-1 text-sm font-bold text-ink">{action.title}</p>
-                  <p className="text-xs leading-relaxed text-muted">{action.description}</p>
-                </Link>
-              );
-            })}
-          </div>
-        </section>
-
-        {/* Recent Receiving Feed */}
-        <section className="card flex flex-col lg:col-span-5">
-          <div className="mb-4 flex items-center justify-between gap-2">
-            <h2 className="section-heading">
-              <FileUp className="size-4.5 text-accent" aria-hidden />
-              <span>קליטות אחרונות</span>
-            </h2>
-            {recentDocuments.length > 0 && (
-              <Link href="/receiving" className="text-xs font-semibold text-accent hover:underline">
-                לכל הקליטות
-              </Link>
-            )}
-          </div>
-
-          {recentDocuments.length === 0 ? (
-            <div className="flex flex-1 flex-col items-center justify-center rounded-xl border border-dashed border-line bg-surface-subtle/40 px-4 py-8 text-center">
-              <span className="mb-3 inline-flex size-11 items-center justify-center rounded-2xl bg-surface text-muted shadow-xs">
-                <FileUp className="size-5" aria-hidden />
-              </span>
-              <p className="text-sm font-semibold text-ink">עוד אין מסמכי קליטה</p>
-              <p className="mt-1 max-w-xs text-xs leading-relaxed text-muted">
-                העלו חשבונית או תעודת משלוח כדי להתחיל לקלוט סחורה למלאי.
-              </p>
-              <Link href="/receiving/new" className="btn-quiet mt-4 min-h-9 px-3.5 text-xs">
-                העלאת מסמך ראשון
-              </Link>
-            </div>
-          ) : (
-            <ul className="divide-y divide-line">
-              {recentDocuments.map((doc) => (
-                <li key={doc.id}>
-                  <Link
-                    href={`/receiving/${doc.id}`}
-                    className="-mx-2 flex items-center justify-between gap-3 rounded-xl px-2.5 py-3 transition-colors hover:bg-surface-subtle"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-ink">
-                        {doc.suppliers?.name ?? doc.supplier_name_raw ?? "מסמך ללא ספק"}
-                      </p>
-                      <p className="mt-0.5 truncate text-xs text-muted">
-                        {[
-                          doc.doc_type && DOCUMENT_TYPE_LABELS[doc.doc_type],
-                          doc.doc_number,
-                          dateFormatter.format(new Date(doc.created_at)),
-                        ]
-                          .filter(Boolean)
-                          .join(" · ")}
-                      </p>
-                    </div>
-                    <span className={`badge shrink-0 ${STATUS_BADGES[doc.status]}`}>
-                      {DOCUMENT_STATUS_LABELS[doc.status]}
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      </div>
+      <SectionDots />
     </div>
   );
 }

@@ -21,7 +21,7 @@ import {
 } from "@/lib/integrations";
 import type { SavedIntegration } from "@/components/onboarding-wizard";
 import { saveIntegration, syncIntegration } from "@/app/(app)/integrations/actions";
-import { formatDateTime } from "@/lib/stock";
+import { formatDateTime } from "@/lib/suite";
 
 const ICONS: Record<IntegrationCategory, typeof Store> = {
   pos_commerce: Store,
@@ -165,22 +165,22 @@ export function IntegrationCard({
                   onClick={() => setMode("live")}
                   className={`min-h-11 cursor-pointer rounded-xl border text-xs font-semibold transition-all ${
                     mode === "live"
-                      ? "border-accent bg-accent text-white dark:text-[#041815]"
+                      ? "border-accent bg-accent text-(--btn-fg)"
                       : "border-line bg-surface text-muted hover:text-ink"
                   }`}
                 >
-                  חיבור חי (API)
+                  חיבור חי
                 </button>
                 <button
                   type="button"
                   onClick={() => setMode("sandbox")}
                   className={`min-h-11 cursor-pointer rounded-xl border text-xs font-semibold transition-all ${
                     mode === "sandbox"
-                      ? "border-accent bg-accent text-white dark:text-[#041815]"
+                      ? "border-accent bg-accent text-(--btn-fg)"
                       : "border-line bg-surface text-muted hover:text-ink"
                   }`}
                 >
-                  Sandbox / ידני
+                  ידני
                 </button>
               </div>
             </div>
@@ -200,7 +200,7 @@ export function IntegrationCard({
               <div>
                 <label className="label flex items-center gap-1.5" htmlFor={`apikey-${category.id}`}>
                   <KeyRound className="size-3.5 text-accent" aria-hidden />
-                  <span>מפתח API / Token</span>
+                  <span>מפתח API</span>
                 </label>
                 <input
                   className="field font-mono text-sm"

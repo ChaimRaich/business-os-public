@@ -65,3 +65,10 @@ export function formatCurrency(amount: number): string {
     maximumFractionDigits: 2,
   }).format(amount);
 }
+
+const dateTimeFormat = new Intl.DateTimeFormat("he-IL", {
+  dateStyle: "short",
+  timeStyle: "short",
+  timeZone: "Asia/Jerusalem",
+});
+export const formatDateTime = (value: string) => dateTimeFormat.format(new Date(value));

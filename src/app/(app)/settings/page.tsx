@@ -1,17 +1,19 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Building2, Plus, Users, Warehouse } from "lucide-react";
 import { requireBusiness } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { can, ROLE_LABELS, ROLES } from "@/lib/permissions";
 import { ActionForm } from "@/components/action-form";
-import { DepartmentsSettings } from "@/components/departments-settings";
+import { PosDepartmentFields } from "@/components/pos-department-fields";
 import {
   addMember,
+  addPosDepartment,
   addWarehouse,
+  deletePosDepartment,
   changeMemberRole,
   removeMember,
   renameBusiness,
+  setLowStockDefault,
   renameWarehouse,
   setDefaultWarehouse,
 } from "../actions";
@@ -34,6 +36,11 @@ export default async function SettingsPage() {
   }
 
   const canManageWarehouses = can(active.role, "warehouses.manage");
+  const { data: departments } = await supabase
+    .from("pos_departments")
+    .select("id, code, department, sub_department, item_name")
+    .eq("business_id", active.businessId)
+    .order("code");
   const { data: warehouses, error: warehousesError } = await supabase
     .from("warehouses")
     .select("id, name, is_default")
@@ -43,24 +50,25 @@ export default async function SettingsPage() {
     throw new Error(`Failed to load warehouses: ${warehousesError.message}`);
   }
 
+  const { data: business } = await supabase
+    .from("businesses")
+    .select("low_stock_default")
+    .eq("id", active.businessId)
+    .maybeSingle();
+
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-extrabold tracking-tight">הגדרות</h1>
-        <p className="mt-0.5 text-sm text-muted">ניהול העסק, מחסנים, מחלקות קופה והרשאות צוות</p>
-      </div>
+      <h1 className="text-3xl sm:text-4xl">הגדרות</h1>
+
+      <section className="card flex flex-wrap items-center justify-between gap-3">
+        <h2 className="font-semibold">חיבורים</h2>
+        <Link href="/settings/connections" className="btn-quiet">
+          מצב החיבורים
+        </Link>
+      </section>
 
       <section className="card">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="section-heading">
-            <Building2 className="size-4.5 text-accent" aria-hidden />
-            <span>פרטי העסק</span>
-          </h2>
-          <Link href="/new-business" className="btn-quiet min-h-9 px-3 text-xs">
-            <Plus className="size-3.5" aria-hidden />
-            <span>פתיחת עסק נוסף</span>
-          </Link>
-        </div>
+        <h2 className="mb-4 font-semibold">פרטי העסק</h2>
         {canEdit ? (
           <ActionForm
             action={renameBusiness}
@@ -75,19 +83,44 @@ export default async function SettingsPage() {
         ) : (
           <p className="text-sm">
             <span className="text-muted">שם העסק: </span>
-            <span className="font-semibold">{active.businessName}</span>
+            {active.businessName}
           </p>
         )}
+        <div id="low-stock" className="mt-4 scroll-mt-32 border-t border-line pt-4">
+          {canEdit ? (
+            <ActionForm action={setLowStockDefault} submitLabel="שמירת הסף" submitClassName="btn-quiet" className="flex flex-wrap items-end gap-3">
+              <div className="w-48">
+                <label className="label" htmlFor="low_stock_default">סף חוסר כללי</label>
+                <input
+                  className="field"
+                  id="low_stock_default"
+                  name="low_stock_default"
+                  dir="ltr"
+                  inputMode="decimal"
+                  defaultValue={business?.low_stock_default ?? ""}
+                  aria-describedby="low-stock-hint"
+                />
+              </div>
+              <p id="low-stock-hint" className="basis-full text-xs text-muted">
+                פריט שיורד לכמות הזו מופיע בחוסרים. ריק: בלי סף כללי.
+              </p>
+            </ActionForm>
+          ) : (
+            <p className="text-sm">
+              <span className="text-muted">סף חוסר כללי: </span>
+              {business?.low_stock_default ?? "לא הוגדר"}
+            </p>
+          )}
+        </div>
+        <p className="mt-4 text-sm text-muted">
+          <Link href="/new-business" className="font-medium text-accent underline-offset-4 hover:underline">
+            פתיחת עסק נוסף
+          </Link>
+        </p>
       </section>
 
       <section className="card">
-        <h2 className="section-heading">
-          <Warehouse className="size-4.5 text-accent" aria-hidden />
-          <span>מחסנים</span>
-        </h2>
-        <p className="mt-1.5 mb-3 text-sm text-muted">
-          סחורה נקלטת למחסן ברירת המחדל, אלא אם בוחרים אחר בזמן הקליטה.
-        </p>
+        <h2 className="font-semibold">מחסנים</h2>
         <ul className="divide-y divide-line">
           {warehouses.map((warehouse) => (
             <li key={warehouse.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 py-3">
@@ -103,16 +136,18 @@ export default async function SettingsPage() {
                   <input className="field min-w-0 flex-1 basis-36 py-2" id={`warehouse-${warehouse.id}`} name="name" defaultValue={warehouse.name} maxLength={80} required />
                 </ActionForm>
               ) : (
-                <span className="min-w-0 flex-1 font-semibold">{warehouse.name}</span>
+                <span className="min-w-0 flex-1 font-medium">{warehouse.name}</span>
               )}
               {warehouse.is_default ? (
-                <span className="badge bg-accent-soft text-accent-strong">ברירת מחדל</span>
+                <span className="rounded-full bg-accent-soft px-3 py-1 text-sm text-accent-strong">
+                  ברירת מחדל
+                </span>
               ) : (
                 canManageWarehouses && (
                   <ActionForm
                     action={setDefaultWarehouse}
                     submitLabel="הפיכה לברירת מחדל"
-                    submitClassName="min-h-10 cursor-pointer px-2 text-sm font-medium text-accent underline-offset-4 hover:underline"
+                    submitClassName="min-h-11 px-2 text-sm text-accent underline-offset-4 hover:underline"
                   >
                     <input type="hidden" name="warehouse_id" value={warehouse.id} />
                   </ActionForm>
@@ -130,35 +165,57 @@ export default async function SettingsPage() {
           >
             <div className="min-w-0 flex-1 basis-48">
               <label className="label" htmlFor="new-warehouse">מחסן או סניף נוסף</label>
-              <input className="field" id="new-warehouse" name="name" maxLength={80} placeholder="למשל: סניף תל אביב" required />
+              <input className="field" id="new-warehouse" name="name" maxLength={80} required />
             </div>
           </ActionForm>
         )}
       </section>
 
-      <DepartmentsSettings businessId={active.businessId} canManage={can(active.role, "departments.manage")} />
+      <section className="card">
+        <h2 className="font-semibold">מחלקות הקופה</h2>
+        <p className="mt-1 text-sm text-muted">
+          בדיוק כפי שהן מוגדרות בקופה.
+        </p>
+        {(departments ?? []).length === 0 ? (
+          <p className="mt-3 text-sm text-muted">בלי מחלקה אי אפשר להכין קובץ לקופה.</p>
+        ) : (
+          <ul className="mt-2 divide-y divide-line">
+            {(departments ?? []).map((department) => (
+              <li key={department.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 py-2">
+                <bdi dir="ltr" className="w-10 font-mono font-semibold">{department.code}</bdi>
+                <span className="min-w-0 flex-1 basis-48">
+                  {department.department} / {department.sub_department}
+                  {department.item_name && <span className="text-sm text-muted"> · שם פריט מוצע: {department.item_name}</span>}
+                </span>
+                {canManageWarehouses && (
+                  <ActionForm action={deletePosDepartment} submitLabel="מחיקה" pendingLabel="מוחק…" submitClassName="min-h-11 px-2 text-sm text-danger underline-offset-4 hover:underline">
+                    <input type="hidden" name="department_id" value={department.id} />
+                  </ActionForm>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+        {canManageWarehouses && (
+          <ActionForm action={addPosDepartment} submitLabel="הוספת מחלקה" submitClassName="btn-quiet" className="mt-2 flex flex-wrap items-end gap-3 border-t border-line pt-4">
+            <PosDepartmentFields />
+          </ActionForm>
+        )}
+      </section>
 
       <section className="card">
-        <h2 className="section-heading mb-4">
-          <Users className="size-4.5 text-accent" aria-hidden />
-          <span>משתמשים והרשאות</span>
-        </h2>
+        <h2 className="mb-4 font-semibold">משתמשים והרשאות</h2>
         <ul className="divide-y divide-line">
           {members.map((member) => {
             const isSelf = member.user_id === user.id;
-            const displayName = member.profiles.full_name ?? member.profiles.email;
-            const initial = (displayName.trim()[0] ?? "U").toUpperCase();
             return (
-              <li key={member.user_id} className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3.5">
-                <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-accent-soft text-xs font-bold text-accent-strong">
-                  {initial}
-                </span>
-                <div className="min-w-0 flex-1 basis-44">
-                  <p className="truncate font-semibold text-ink">
-                    {displayName}
-                    {isSelf && <span className="ms-1.5 text-xs font-normal text-muted">(אתם)</span>}
+              <li key={member.user_id} className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3">
+                <div className="min-w-0 flex-1 basis-48">
+                  <p className="truncate font-medium">
+                    {member.profiles.full_name ?? member.profiles.email}
+                    {isSelf && <span className="text-muted"> (אתם)</span>}
                   </p>
-                  <p className="truncate text-right text-xs text-muted" dir="ltr">
+                  <p className="truncate text-right text-sm text-muted" dir="ltr">
                     {member.profiles.email}
                   </p>
                 </div>
@@ -190,14 +247,14 @@ export default async function SettingsPage() {
                     <ActionForm
                       action={removeMember}
                       submitLabel="הסרה"
-                      submitClassName="btn-danger"
+                      submitClassName="btn-quiet text-danger"
                       className="flex flex-wrap items-center gap-2"
                     >
                       <input type="hidden" name="user_id" value={member.user_id} />
                     </ActionForm>
                   </>
                 ) : (
-                  <span className="badge bg-accent-soft text-accent-strong">
+                  <span className="rounded-full bg-accent-soft px-3 py-1 text-sm text-accent-strong">
                     {ROLE_LABELS[member.role]}
                   </span>
                 )}
@@ -208,7 +265,7 @@ export default async function SettingsPage() {
 
         {canManage && (
           <div className="mt-6 border-t border-line pt-5">
-            <h3 className="mb-3 text-sm font-bold text-ink">הוספת משתמש לעסק</h3>
+            <h3 className="mb-3 text-sm font-semibold">הוספת משתמש</h3>
             <ActionForm
               action={addMember}
               submitLabel="הוספה"
@@ -216,7 +273,7 @@ export default async function SettingsPage() {
             >
               <div className="min-w-0 flex-1 basis-60">
                 <label className="label" htmlFor="member-email">אימייל של משתמש רשום</label>
-                <input className="field" id="member-email" name="email" type="email" dir="ltr" placeholder="team@business.co.il" required />
+                <input className="field" id="member-email" name="email" type="email" dir="ltr" required />
               </div>
               <div>
                 <label className="label" htmlFor="member-role">תפקיד</label>
@@ -229,9 +286,6 @@ export default async function SettingsPage() {
                 </select>
               </div>
             </ActionForm>
-            <p className="mt-3 text-xs text-muted">
-              המשתמש צריך להירשם לאתר לפני שאפשר לצרף אותו לעסק.
-            </p>
           </div>
         )}
       </section>

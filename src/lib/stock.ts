@@ -1,41 +1,32 @@
-import type { Database } from "@/lib/database.types";
-import { catalogErrorMessage } from "@/lib/catalog";
+export type StockState = "negative" | "out" | "low" | "ok";
 
-export type MovementKind = Database["public"]["Enums"]["movement_kind"];
+/** Worst first: the order the shortage screen lists them in. */
+export const STOCK_STATES: StockState[] = ["negative", "out", "low", "ok"];
 
-export const MOVEMENT_KIND_LABELS: Record<MovementKind, string> = {
-  receipt: "קליטת סחורה",
-  adjustment: "התאמת מלאי",
+export const STOCK_STATE_LABELS: Record<StockState, string> = {
+  negative: "במינוס",
+  out: "אזל",
+  low: "מתחת לסף",
+  ok: "תקין",
 };
 
-const MESSAGES: Record<string, string> = {
-  missing_supplier: "צריך לבחור ספק בפרטי המסמך.",
-  no_lines: "אין שורות לאישור.",
-  incomplete_lines: "לכל שורה צריך מוצר וכמות גדולה מאפס.",
-  not_in_review: "המסמך אינו במצב שאפשר לאשר.",
-  document_locked: "הקליטה כבר אושרה ונעולה לעריכה. לתיקון משתמשים בהתאמת מלאי.",
-  line_already_linked: "השורה כבר משויכת למוצר.",
-  line_not_found: "השורה לא נמצאה. רעננו את העמוד ונסו שוב.",
-  negative_stock: "אי אפשר להוריד יותר ממה שיש במלאי במחסן הזה.",
-  barcode_sequence_full: "הרצף של הברקודים הפנימיים לספק הזה מלא.",
-  stock_movements_adjustment_has_reason: "חובה לכתוב סיבה להתאמה.",
+export const STOCK_STATE_STYLES: Record<StockState, string> = {
+  negative: "bg-danger-soft text-danger",
+  out: "bg-danger-soft text-danger",
+  low: "bg-warn-soft text-warn",
+  ok: "bg-accent-soft text-accent-strong",
 };
 
-/** Turns a database error from stock, approval or export into a message the user can act on. */
-export function stockErrorMessage(error: { code?: string; message: string; details?: string | null }): string {
-  const known = Object.keys(MESSAGES).find((key) => error.message.includes(key));
-  return known ? MESSAGES[known] : catalogErrorMessage(error);
+export const STOCK_STATE_ABOUT: Record<Exclude<StockState, "ok">, string> = {
+  negative: "נמכר יותר ממה שנקלט במערכת. בדרך כלל חסרה קליטה או יתרת פתיחה; מתקנים בדף המוצר.",
+  out: "לא נשארה אף יחידה.",
+  low: "הכמות הגיעה לסף החוסר או ירדה ממנו.",
+};
+
+export function isStockState(value: unknown): value is StockState {
+  return STOCK_STATES.includes(value as StockState);
 }
 
-const quantityFormat = new Intl.NumberFormat("en-US", { maximumFractionDigits: 3 });
-export const formatQuantity = (value: number) => quantityFormat.format(value);
-
-const dateTimeFormat = new Intl.DateTimeFormat("he-IL", {
-  dateStyle: "short",
-  timeStyle: "short",
-  timeZone: "Asia/Jerusalem",
-});
-export const formatDateTime = (value: string) => dateTimeFormat.format(new Date(value));
-
-export const itemTitle = (productName: string, variantLabel: string) =>
-  variantLabel ? `${productName} · ${variantLabel}` : productName;
+/** Quantities are whole units almost always; show a fraction only when there is one. */
+export const formatQuantity = (value: number) =>
+  value.toLocaleString("en-US", { maximumFractionDigits: 3 });

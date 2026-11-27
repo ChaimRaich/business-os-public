@@ -7,10 +7,7 @@ import { z } from "zod";
 import { requireBusiness } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { runExtraction } from "@/lib/extraction/run";
-import { loadExportData } from "@/lib/export-data";
-import { buildPosWorkbook, planExport, sheetName, TEMPLATE_VERSION } from "@/lib/pos-export";
-import { asMaterial, asProductType } from "@/lib/pricing";
-import { stockErrorMessage } from "@/lib/stock";
+import { ensureTillDefaults } from "@/lib/till-defaults";
 import {
   DOCUMENT_TYPES,
   DOCUMENTS_BUCKET,
@@ -146,13 +143,72 @@ export async function updateDocumentHeader(_: FormState, formData: FormData): Pr
   return { ok: "פרטי המסמך נשמרו." };
 }
 
-const FIELD_LABELS = {
-  quantity: "כמות",
-  unit_cost: "עלות",
-  retail_price: "מחיר צרכן",
-  sale_price: "מחיר מכירה",
-  club_price: "מחיר מועדון",
-} as const;
+const supplierDigits = (value: string | null) => (value ?? "").replace(/\D/g, "");
+
+/**
+ * One step instead of a detour through the suppliers screen: the supplier printed on
+ * the document is added to the list (unless it is already there) and chosen for the document.
+ */
+export async function addSupplierFromDocument(_: FormState, formData: FormData): Promise<FormState> {
+  const { active } = await requireBusiness();
+  const id = String(formData.get("id") ?? "");
+  if (!z.uuid().safeParse(id).success) {
+    return { error: GENERIC_ERROR };
+  }
+  const supabase = await createClient();
+  const { data: document } = await supabase
+    .from("documents")
+    .select("id, supplier_name_raw, supplier_tax_id_raw")
+    .eq("id", id)
+    .eq("business_id", active.businessId)
+    .eq("status", "review")
+    .maybeSingle();
+  if (!document) {
+    return { error: "המסמך לא נמצא או שאינו פתוח לעריכה." };
+  }
+  const name = (document.supplier_name_raw ?? "").trim().slice(0, 120);
+  if (!name) {
+    return { error: "שם הספק לא נקרא מהמסמך. בחרו ספק מהרשימה או הוסיפו אותו במסך הספקים." };
+  }
+  const taxId = supplierDigits(document.supplier_tax_id_raw);
+
+  const { data: suppliers } = await supabase
+    .from("suppliers")
+    .select("id, name, tax_id")
+    .eq("business_id", active.businessId);
+  let supplierId =
+    suppliers?.find(
+      (s) => (taxId && supplierDigits(s.tax_id) === taxId) || s.name.trim().toLowerCase() === name.toLowerCase(),
+    )?.id ?? null;
+  if (!supplierId) {
+    const { data: created, error } = await supabase
+      .from("suppliers")
+      .insert({ business_id: active.businessId, name, tax_id: taxId || null })
+      .select("id")
+      .single();
+    if (error) {
+      return { error: GENERIC_ERROR };
+    }
+    supplierId = created.id;
+  }
+
+  const { error: updateError } = await supabase
+    .from("documents")
+    .update({ supplier_id: supplierId })
+    .eq("id", id)
+    .eq("business_id", active.businessId)
+    .eq("status", "review");
+  if (updateError) {
+    return { error: GENERIC_ERROR };
+  }
+  await supabase.rpc("match_document_lines", { p_document_id: id });
+  revalidatePath(`/receiving/${id}`);
+  revalidatePath("/receiving");
+  revalidatePath("/suppliers");
+  return null;
+}
+
+const FIELD_LABELS = { quantity: "כמות", unit_cost: "עלות", retail_price: "מחיר צרכן" } as const;
 
 /** Saves the whole table as the user sees it, in the order shown. */
 export async function saveDocumentLines(
@@ -183,16 +239,11 @@ export async function saveDocumentLines(
       quantity: null,
       unit_cost: null,
       retail_price: null,
-      sale_price: null,
-      club_price: null,
     };
     for (const field of Object.keys(FIELD_LABELS) as (keyof typeof FIELD_LABELS)[]) {
       const value = parseAmount(String(row[field] ?? ""));
       if (value === undefined) {
         return { error: `שורה ${index + 1}: הערך בשדה ${FIELD_LABELS[field]} אינו מספר.` };
-      }
-      if (value === 0 && (field === "sale_price" || field === "club_price")) {
-        return { error: `שורה ${index + 1}: ${FIELD_LABELS[field]} חייב להיות גדול מאפס, או ריק לחישוב אוטומטי.` };
       }
       numbers[field] = value;
     }
@@ -203,9 +254,6 @@ export async function saveDocumentLines(
       description: String(row.description ?? "").slice(0, 500),
       variant_text: String(row.variant_text ?? "").slice(0, 80),
       ...numbers,
-      product_type: asProductType(row.product_type),
-      material: asMaterial(row.material),
-      manual_variant_id: z.uuid().safeParse(row.manual_variant_id).success ? row.manual_variant_id : null,
       // A row the user did not touch keeps what the document said about it;
       // an edited row is the user's word, so its flags and printed total are dropped.
       ...(kept
@@ -230,6 +278,78 @@ export async function saveDocumentLines(
   revalidatePath(`/receiving/${documentId}`);
   revalidatePath("/receiving");
   return { ok: "השורות נשמרו." };
+}
+
+/** Adds the lines that are not in the catalog yet as products of the document's supplier. */
+export async function createMissingProducts(_: FormState, formData: FormData): Promise<FormState> {
+  await requireBusiness();
+  const id = String(formData.get("id") ?? "");
+  if (!z.uuid().safeParse(id).success) {
+    return { error: GENERIC_ERROR };
+  }
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("create_products_from_lines", { p_document_id: id });
+  if (error) {
+    if (error.message.includes("supplier_required")) {
+      return { error: "קודם בוחרים ספק בפרטי המסמך ושומרים: המוצרים החדשים נרשמים על שמו." };
+    }
+    if (error.message.includes("not_in_review") || error.message.includes("document_not_found")) {
+      return { error: "המסמך לא נמצא או שאינו פתוח לעריכה." };
+    }
+    if (error.message.includes("variant_codes_unique_code")) {
+      return { error: "אחד הברקודים כבר משויך לפריט אחר בקטלוג. בדקו את השורות ונסו שוב." };
+    }
+    return { error: GENERIC_ERROR };
+  }
+  revalidatePath(`/receiving/${id}`);
+  revalidatePath("/products");
+  return {
+    ok: data === 0 ? "לא נוספו פריטים חדשים." : data === 1 ? "נוסף פריט אחד לקטלוג." : `נוספו ${data} פריטים לקטלוג.`,
+  };
+}
+
+const APPROVAL_ERRORS: Record<string, string> = {
+  unmatched_lines: "יש שורות שעוד לא קיימות בקטלוג. צריך להוסיף אותן לקטלוג או למחוק אותן לפני האישור.",
+  bad_quantity: "יש שורות בלי כמות או עם כמות אפס. השלימו את הכמות שהתקבלה בפועל ושמרו.",
+  no_lines: "אין במסמך שורות לקליטה.",
+  duplicate_document: "מסמך של אותו ספק עם אותו מספר כבר נקלט למלאי. המלאי לא עודכן שוב.",
+  not_in_review: "המסמך אינו פתוח לאישור.",
+  document_not_found: "המסמך לא נמצא.",
+};
+
+/** Writes the stock movements for the saved lines. Safe to repeat: stock changes once. */
+export async function approveDocument(_: FormState, formData: FormData): Promise<FormState> {
+  const { active } = await requireBusiness();
+  const id = String(formData.get("id") ?? "");
+  if (!z.uuid().safeParse(id).success) {
+    return { error: GENERIC_ERROR };
+  }
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("approve_document", { p_document_id: id });
+  if (error) {
+    const known = Object.keys(APPROVAL_ERRORS).find((code) => error.message.includes(code));
+    // The page may be stale: show what the document looks like now.
+    revalidatePath(`/receiving/${id}`);
+    return { error: known ? APPROVAL_ERRORS[known] : GENERIC_ERROR };
+  }
+  // So the till file is ready to make right away, with nothing left to set up.
+  await ensureTillDefaults(supabase, active.businessId, id);
+  revalidatePath(`/receiving/${id}`);
+  revalidatePath("/receiving");
+  revalidatePath("/products");
+  return null;
+}
+
+/** For documents approved before the till details were filled in by themselves. */
+export async function fillTillDefaults(_: FormState, formData: FormData): Promise<FormState> {
+  const { active } = await requireBusiness();
+  const id = String(formData.get("id") ?? "");
+  if (!z.uuid().safeParse(id).success) {
+    return { error: GENERIC_ERROR };
+  }
+  await ensureTillDefaults(await createClient(), active.businessId, id);
+  revalidatePath(`/receiving/${id}/export`);
+  return null;
 }
 
 /** Lets the user type the rows by hand when reading failed. */
@@ -270,7 +390,9 @@ export async function deleteDocument(_: FormState, formData: FormData): Promise<
     .eq("business_id", active.businessId)
     .select("id");
   if (error) {
-    return { error: GENERIC_ERROR };
+    return {
+      error: error.code === "23503" ? "מסמך שנקלט למלאי אי אפשר למחוק." : GENERIC_ERROR,
+    };
   }
   if (data.length === 0) {
     return { error: "רק בעלים או מנהל יכולים למחוק מסמך." };
@@ -282,227 +404,102 @@ export async function deleteDocument(_: FormState, formData: FormData): Promise<
   redirect("/receiving");
 }
 
-// --- Linking lines to the catalog ---------------------------------------------
+const EXPORT_ERRORS: Record<string, string> = {
+  supplier_required: "למסמך לא נבחר ספק.",
+  supplier_pos_missing: "בכרטיס הספק חסרים קוד הספק ושם הספק כפי שהם בקופה.",
+  rows_incomplete: "בכל שורה צריך מחלקה, שם פריט, מחיר מועדון ומחיר מכירה.",
+  cost_missing: "יש פריט בלי עלות במסמך, והקובץ לקופה דורש עלות בכל שורה.",
+  barcode_rule_missing: "בכרטיס הספק לא הוגדר הברקוד הפנימי הבא.",
+  barcode_missing: "יש פריט בלי ברקוד ובלי מק״ט של הספק, ואין מה לכתוב בעמודת הברקוד.",
+  variant_codes_unique_code: "אחד הברקודים כבר שייך לפריט אחר בקופה. בדקו את הברקוד הבא בכרטיס הספק.",
+  not_approved: "קובץ לקופה מכינים רק אחרי אישור הקליטה.",
+  document_not_found: "המסמך לא נמצא.",
+};
 
-type Result = { error?: string; ok?: string };
+type ExportRowInput = {
+  variant_id: string;
+  item_name: string;
+  department_id: string;
+  club_price: string;
+  sale_price: string;
+};
 
-/** The document of a line, only if the line belongs to the active business. */
-async function ownLine(lineId: string, businessId: string) {
-  if (!z.uuid().safeParse(lineId).success) {
-    return null;
+/** Stores the till file for an approved document. Stock is not touched. */
+export async function createPosExport(documentId: string, rows: ExportRowInput[]): Promise<{ error: string } | null> {
+  await requireBusiness();
+  if (!z.uuid().safeParse(documentId).success || !Array.isArray(rows) || rows.length > 500) {
+    return { error: GENERIC_ERROR };
+  }
+  const payload = [];
+  for (const row of rows) {
+    const club = parseAmount(String(row.club_price ?? ""));
+    const sale = parseAmount(String(row.sale_price ?? ""));
+    if (!club || !sale || !z.uuid().safeParse(row.variant_id).success || !z.uuid().safeParse(row.department_id).success) {
+      return { error: EXPORT_ERRORS.rows_incomplete };
+    }
+    payload.push({
+      variant_id: row.variant_id,
+      item_name: String(row.item_name ?? "").trim().slice(0, 80),
+      department_id: row.department_id,
+      club_price: club,
+      sale_price: sale,
+    });
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("create_pos_export", { p_document_id: documentId, p_rows: payload });
+  if (error) {
+    const known = Object.keys(EXPORT_ERRORS).find((code) => `${error.message} ${error.details ?? ""}`.includes(code));
+    return { error: known ? EXPORT_ERRORS[known] : GENERIC_ERROR };
+  }
+  revalidatePath(`/receiving/${documentId}/export`);
+  revalidatePath(`/receiving/${documentId}`);
+  return null;
+}
+
+export async function confirmPosExport(_: FormState, formData: FormData): Promise<FormState> {
+  await requireBusiness();
+  const exportId = String(formData.get("export_id") ?? "");
+  const documentId = String(formData.get("document_id") ?? "");
+  if (!z.uuid().safeParse(exportId).success || !z.uuid().safeParse(documentId).success) {
+    return { error: GENERIC_ERROR };
   }
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("document_lines")
-    .select("document_id")
-    .eq("id", lineId)
-    .eq("business_id", businessId)
-    .maybeSingle();
-  return data ? { supabase, documentId: data.document_id } : null;
+  const { error } = await supabase.rpc("confirm_pos_export", { p_export_id: exportId });
+  if (error) {
+    return { error: GENERIC_ERROR };
+  }
+  revalidateExports(documentId);
+  return null;
 }
 
-export type CatalogHit = { variantId: string; productName: string; variantLabel: string; codes: string[] };
-
-export async function searchCatalog(query: string): Promise<CatalogHit[]> {
-  const { active } = await requireBusiness();
-  const term = String(query ?? "").trim().slice(0, 100);
-  if (!term) {
-    return [];
+/** The user reports that the till rejected the file, with what it showed. */
+export async function reportPosExportProblem(_: FormState, formData: FormData): Promise<FormState> {
+  await requireBusiness();
+  const exportId = String(formData.get("export_id") ?? "");
+  const documentId = String(formData.get("document_id") ?? "");
+  const note = String(formData.get("note") ?? "").trim();
+  if (!z.uuid().safeParse(exportId).success || !z.uuid().safeParse(documentId).success) {
+    return { error: GENERIC_ERROR };
+  }
+  if (!note) {
+    return { error: "כתבו מה הקופה הציגה, כדי שיהיה אפשר לטפל בזה." };
   }
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .rpc("search_products", { p_business_id: active.businessId, p_query: term })
-    .select("id, name, product_variants (id, label, variant_codes (code))")
-    .limit(10);
+  const { error } = await supabase.rpc("report_pos_export_problem", { p_export_id: exportId, p_note: note });
   if (error) {
-    throw new Error(`Catalog search failed: ${error.message}`);
+    return {
+      error: error.message.includes("already_confirmed") ? "הקובץ כבר סומן כנקלט בקופה." : GENERIC_ERROR,
+    };
   }
-  return data.flatMap((product) =>
-    product.product_variants.map((variant) => ({
-      variantId: variant.id,
-      productName: product.name,
-      variantLabel: variant.label,
-      codes: variant.variant_codes.map((c) => c.code),
-    })),
-  );
+  revalidateExports(documentId);
+  return { ok: "התקלה נשמרה." };
 }
 
-/** Links a line to an existing item; a null variant removes a manual link. */
-export async function linkLine(lineId: string, variantId: string | null): Promise<Result> {
-  const { active } = await requireBusiness();
-  const line = await ownLine(lineId, active.businessId);
-  if (!line || (variantId !== null && !z.uuid().safeParse(variantId).success)) {
-    return { error: GENERIC_ERROR };
-  }
-  const { error } = await line.supabase.rpc("link_document_line", {
-    p_line_id: lineId,
-    p_variant_id: variantId,
-  });
-  if (error) {
-    return { error: stockErrorMessage(error) };
-  }
-  revalidatePath(`/receiving/${line.documentId}`);
-  return {};
-}
-
-const NewItem = z.object({
-  lineId: z.uuid(),
-  productId: z.uuid().nullable(),
-  name: z.string().trim().max(200),
-  label: z.string().trim().max(80),
-  productType: z.string(),
-  material: z.string(),
-});
-
-export async function createItemForLine(input: unknown): Promise<Result> {
-  const { active } = await requireBusiness();
-  const parsed = NewItem.safeParse(input);
-  if (!parsed.success) {
-    return { error: GENERIC_ERROR };
-  }
-  const item = parsed.data;
-  if (!item.productId && !item.name) {
-    return { error: "יש להזין שם מוצר." };
-  }
-  const line = await ownLine(item.lineId, active.businessId);
-  if (!line) {
-    return { error: GENERIC_ERROR };
-  }
-  const { error } = await line.supabase.rpc("create_item_for_line", {
-    p_line_id: item.lineId,
-    p_product_id: item.productId,
-    p_name: item.name,
-    p_label: item.label,
-    p_product_type: asProductType(item.productType) ?? undefined,
-    p_material: asMaterial(item.material) ?? undefined,
-  });
-  if (error) {
-    return { error: stockErrorMessage(error) };
-  }
-  revalidatePath(`/receiving/${line.documentId}`);
-  revalidatePath("/products");
-  return { ok: "המוצר נוצר ושויך לשורה." };
-}
-
-// --- Approval and POS export ----------------------------------------------------
-
-async function ownDocument(documentId: string, businessId: string) {
-  if (!z.uuid().safeParse(documentId).success) {
-    return null;
-  }
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("documents")
-    .select("id")
-    .eq("id", documentId)
-    .eq("business_id", businessId)
-    .maybeSingle();
-  return data ? supabase : null;
-}
-
-export async function approveDocument(documentId: string): Promise<Result> {
-  const { active } = await requireBusiness();
-  const supabase = await ownDocument(documentId, active.businessId);
-  if (!supabase) {
-    return { error: GENERIC_ERROR };
-  }
-  // The database does the whole thing once; approving again changes nothing.
-  const { error } = await supabase.rpc("approve_document", { p_document_id: documentId });
-  if (error) {
-    return { error: stockErrorMessage(error) };
-  }
+/** The till status of a file shows on the document, the lists and the history. */
+function revalidateExports(documentId: string) {
+  revalidatePath(`/receiving/${documentId}/export`);
   revalidatePath(`/receiving/${documentId}`);
   revalidatePath("/receiving");
-  revalidatePath("/products", "layout");
-  return { ok: "הקליטה אושרה והמלאי עודכן." };
-}
-
-export async function fillLineCost(_: FormState, formData: FormData): Promise<FormState> {
-  const { active } = await requireBusiness();
-  const lineId = String(formData.get("line_id") ?? "");
-  const cost = parseAmount(String(formData.get("unit_cost") ?? ""));
-  if (!cost) {
-    return { error: "יש להזין עלות גדולה מאפס." };
-  }
-  const line = await ownLine(lineId, active.businessId);
-  if (!line) {
-    return { error: GENERIC_ERROR };
-  }
-  const { error } = await line.supabase.rpc("fill_line_cost", { p_line_id: lineId, p_cost: cost });
-  if (error) {
-    return { error: stockErrorMessage(error) };
-  }
-  revalidatePath(`/receiving/${line.documentId}`);
-  return { ok: "העלות נשמרה." };
-}
-
-/** Creates the POS file once. Never touches stock. */
-export async function createPosExport(_: FormState, formData: FormData): Promise<FormState> {
-  const { active } = await requireBusiness();
-  const documentId = String(formData.get("id") ?? "");
-  const supabase = await ownDocument(documentId, active.businessId);
-  if (!supabase) {
-    return { error: GENERIC_ERROR };
-  }
-  const { error: barcodeError } = await supabase.rpc("assign_internal_barcodes", { p_document_id: documentId });
-  if (barcodeError) {
-    return { error: stockErrorMessage(barcodeError) };
-  }
-
-  const data = await loadExportData(supabase, active.businessId, documentId);
-  if (!data || data.status !== "approved") {
-    return { error: "אפשר ליצור קובץ רק לקליטה מאושרת." };
-  }
-  if (data.existingInPos.length > 0 && formData.get("confirm_existing") !== "on") {
-    return { error: "יש בקובץ פריטים שאולי כבר קיימים בקופה. סמנו את תיבת האישור כדי להמשיך." };
-  }
-  const plan = planExport(data.input);
-  if (plan.problems.length > 0) {
-    revalidatePath(`/receiving/${documentId}`);
-    return { error: "חסרים פרטים. הרשימה המלאה מופיעה למעלה." };
-  }
-
-  const file = buildPosWorkbook(plan.rows, sheetName(data.input.supplier.posName!));
-  const baseName = `pos-${data.input.supplier.posName}-${data.docNumber ?? documentId.slice(0, 8)}`;
-  const { error } = await supabase.from("pos_exports").insert({
-    business_id: active.businessId,
-    document_id: documentId,
-    file_name: `${baseName.replace(/[\\/:*?"<>|\s]+/g, "-")}.xls`,
-    template_version: TEMPLATE_VERSION,
-    row_count: plan.rows.length,
-    variant_ids: plan.variantIds,
-    content_base64: file.toString("base64"),
-  });
-  // 23505: a parallel click created it first; that file is the one.
-  if (error && error.code !== "23505") {
-    return { error: stockErrorMessage(error) };
-  }
-  revalidatePath(`/receiving/${documentId}`);
-  return { ok: "הקובץ מוכן להורדה." };
-}
-
-export async function markExportUploaded(_: FormState, formData: FormData): Promise<FormState> {
-  const { active } = await requireBusiness();
-  const documentId = String(formData.get("id") ?? "");
-  const supabase = await ownDocument(documentId, active.businessId);
-  if (!supabase) {
-    return { error: GENERIC_ERROR };
-  }
-  if (formData.get("confirm") !== "on") {
-    return { error: "סמנו שהקובץ נקלט בקופה." };
-  }
-  const { data: record } = await supabase
-    .from("pos_exports")
-    .select("id")
-    .eq("document_id", documentId)
-    .maybeSingle();
-  if (!record) {
-    return { error: GENERIC_ERROR };
-  }
-  const { error } = await supabase.rpc("mark_export_uploaded", { p_export_id: record.id });
-  if (error) {
-    return { error: stockErrorMessage(error) };
-  }
-  revalidatePath(`/receiving/${documentId}`);
-  return { ok: "סומן כהועלה לקופה." };
+  revalidatePath("/exports");
 }

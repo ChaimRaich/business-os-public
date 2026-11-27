@@ -1577,6 +1577,44 @@ html {
     width: 20rem;
   }
 }
+.chat-ava.is-lg,
+.chat-ava.is-lg .logo-tile {
+  width: 3.5rem;
+  height: 3.5rem;
+}
+.chat-ava.is-lg .chat-ava-star {
+  width: 1.35rem;
+  height: 1.35rem;
+}
+
+/* The team page: the work manager on top, a card per worker below. */
+.worker-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.worker-card[data-main="true"] {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--rule));
+}
+/* The work manager's card: who they are on one side, what the team found on the other. */
+@media (min-width: 640px) {
+  .worker-card[data-main="true"] {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 2rem;
+  }
+}
+.worker-finding {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 2.25rem;
+  font-size: 0.875rem;
+}
+.worker-finding:hover .worker-finding-text {
+  text-decoration: underline;
+}
+
 .chat-row-role {
   color: var(--muted);
   font-size: 0.8125rem;

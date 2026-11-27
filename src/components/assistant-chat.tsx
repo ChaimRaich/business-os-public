@@ -167,10 +167,11 @@ const CloseIcon = () => (
   </svg>
 );
 
-function ChannelAvatar({ id }: { id: ChannelId }) {
+/** A worker's round picture: the logo for the work manager, a coloured icon for each area. */
+export function ChannelAvatar({ id, large = false }: { id: ChannelId; large?: boolean }) {
   if (id === "main") {
     return (
-      <span className="chat-ava" data-channel="main" aria-hidden="true">
+      <span className={large ? "chat-ava is-lg" : "chat-ava"} data-channel="main" aria-hidden="true">
         <LogoTile />
         <span className="chat-ava-star">
           <Star size={10} fill="currentColor" strokeWidth={0} />
@@ -180,8 +181,8 @@ function ChannelAvatar({ id }: { id: ChannelId }) {
   }
   const Icon = CHANNEL_ICONS[id];
   return (
-    <span className="chat-ava" data-channel={id} aria-hidden="true">
-      <Icon size={19} strokeWidth={2.1} />
+    <span className={large ? "chat-ava is-lg" : "chat-ava"} data-channel={id} aria-hidden="true">
+      <Icon size={large ? 26 : 19} strokeWidth={2.1} />
     </span>
   );
 }
@@ -203,8 +204,8 @@ export function AssistantChat(props: ChatProps) {
   return <Chats {...props} variant="floating" />;
 }
 
-/** The workers page: the same chats, laid out in the page instead of floating in the corner. */
-export function WorkersChats(props: ChatProps) {
+/** A worker's own page: the same chats, laid out in the page instead of floating in the corner. */
+export function WorkersChats(props: ChatProps & { initialChannel: ChannelId }) {
   return <Chats {...props} variant="page" />;
 }
 
@@ -218,7 +219,8 @@ function Chats({
   userId,
   canManage,
   variant,
-}: ChatProps & { variant: "floating" | "page" }) {
+  initialChannel = "main",
+}: ChatProps & { variant: "floating" | "page"; initialChannel?: ChannelId }) {
   const inPage = variant === "page";
   const storageKey = `${STORAGE_PREFIX}${userId}:${businessId}`;
   const allChats = useSyncExternalStore(
@@ -230,10 +232,9 @@ function Chats({
 
   const [open, setOpen] = useState(inPage);
   const [openedAt, setOpenedAt] = useState(() => (inPage ? Date.now() : 0));
-  const [active, setActive] = useState<ChannelId>("main");
+  const [active, setActive] = useState<ChannelId>(initialChannel);
   // Narrow screens show one pane at a time; wide screens show the list beside the conversation.
-  // The page opens on the list of workers; the corner panel opens on the conversation.
-  const [view, setView] = useState<"list" | "chat">(inPage ? "list" : "chat");
+  const [view, setView] = useState<"list" | "chat">("chat");
   const [pending, setPending] = useState<ChannelId[]>([]);
   const [unread, setUnread] = useState<ChannelId[]>([]);
   /** The answer that is being revealed right now, by its timestamp. */
@@ -305,6 +306,8 @@ function Chats({
 
   const pick = (id: ChannelId) => {
     setActive(id);
+    // On a worker's page the address follows the worker, so it can be shared or reloaded.
+    if (inPage) window.history.replaceState(null, "", `${WORKERS_PATH}/${id}`);
     setView("chat");
     setTyping(null);
     setUnread((current) => current.filter((item) => item !== id));
@@ -535,7 +538,11 @@ function Chats({
 
           <div ref={log} className="chat-log">
             <p key={active} className="chat-bubble" data-role="assistant" data-first="true">
-              {active === "main" ? `היי, אני העוזר של ${businessName}.` : `זה הצ׳אט של ${channel.name}.`}
+              {inPage
+                ? `היי, אני ${active === "main" ? "מנהל העבודה" : channel.worker} של ${businessName}.`
+                : active === "main"
+                  ? `היי, אני העוזר של ${businessName}.`
+                  : `זה הצ׳אט של ${channel.name}.`}
               {"\n"}
               {channel.greeting}
             </p>

@@ -3,34 +3,35 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --bos-canvas: #f5f5f2;
+  --bos-canvas: #f4f5f2;
   --bos-surface: #ffffff;
-  --bos-surface-subtle: #efefe9;
-  --bos-ink: #141716;
-  --bos-muted: #5f6662;
-  --bos-line: #e2e3dc;
-  --bos-line-strong: #cdd0c7;
-  --bos-accent: #0d7a6c;
-  --bos-accent-strong: #095b50;
-  --bos-accent-soft: #e3f4f1;
+  --bos-surface-subtle: #eeefe9;
+  --bos-ink: #111514;
+  --bos-muted: #5c6560;
+  --bos-line: #e2e4dd;
+  --bos-line-strong: #c9cec4;
+  --bos-accent: #0c7c6e;
+  --bos-accent-strong: #085c51;
+  --bos-accent-soft: #e1f5f1;
   --bos-danger: #c62828;
   --bos-danger-soft: #fef0f0;
   --bos-warning: #a15c07;
   --bos-warning-soft: #fef7e6;
   --bos-warning-border: #eab308;
-  --bos-shadow-card: 0 1px 2px rgba(20, 23, 22, 0.04), 0 4px 12px rgba(20, 23, 22, 0.03);
-  --bos-shadow-elevated: 0 4px 20px rgba(20, 23, 22, 0.08);
+  --bos-shadow-card: 0 1px 2px rgba(17, 21, 20, 0.04), 0 6px 20px rgba(17, 21, 20, 0.03);
+  --bos-shadow-hover: 0 4px 12px rgba(17, 21, 20, 0.06), 0 12px 28px rgba(12, 124, 110, 0.07);
+  --bos-shadow-elevated: 0 12px 36px rgba(17, 21, 20, 0.14);
   color-scheme: light;
 }
 
 .dark {
-  --bos-canvas: #0b0f13;
-  --bos-surface: #121820;
-  --bos-surface-subtle: #19222d;
-  --bos-ink: #f0f4f8;
-  --bos-muted: #8c9aab;
-  --bos-line: #222e3c;
-  --bos-line-strong: #314154;
+  --bos-canvas: #090d11;
+  --bos-surface: #11171f;
+  --bos-surface-subtle: #18212c;
+  --bos-ink: #f1f5f9;
+  --bos-muted: #8b9bb0;
+  --bos-line: #212d3b;
+  --bos-line-strong: #324357;
   --bos-accent: #14b8a6;
   --bos-accent-strong: #2dd4bf;
   --bos-accent-soft: rgba(20, 184, 166, 0.14);
@@ -39,8 +40,9 @@
   --bos-warning: #fbbf24;
   --bos-warning-soft: rgba(251, 191, 36, 0.12);
   --bos-warning-border: rgba(251, 191, 36, 0.45);
-  --bos-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.03);
-  --bos-shadow-elevated: 0 8px 28px rgba(0, 0, 0, 0.45);
+  --bos-shadow-card: 0 1px 3px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  --bos-shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(20, 184, 166, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --bos-shadow-elevated: 0 20px 48px rgba(0, 0, 0, 0.65);
   color-scheme: dark;
 }
 
@@ -68,7 +70,10 @@ html {
 }
 
 body {
-  background: var(--bos-canvas);
+  background-color: var(--bos-canvas);
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -15%, color-mix(in srgb, var(--bos-accent) 9%, transparent), transparent 65%);
+  background-attachment: fixed;
   color: var(--bos-ink);
   transition: background-color 180ms ease, color 180ms ease;
 }
@@ -78,9 +83,46 @@ body {
   color: var(--bos-accent-strong);
 }
 
+/* Refined thin scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--bos-line-strong);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--bos-muted);
+}
+
+@keyframes bos-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-enter {
+  animation: bos-fade-up 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-enter {
+    animation: none;
+  }
+}
+
 @layer components {
   .field {
-    @apply block w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-base text-ink outline-none transition-all placeholder:text-muted/65 hover:border-line-strong focus:border-accent focus:ring-3 focus:ring-accent/20 disabled:cursor-not-allowed disabled:opacity-60;
+    @apply block w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-base text-ink outline-none transition-all placeholder:text-muted/60 hover:border-line-strong focus:border-accent focus:ring-3 focus:ring-accent/20 disabled:cursor-not-allowed disabled:opacity-60;
   }
 
   .label {
@@ -88,11 +130,12 @@ body {
   }
 
   .btn {
-    @apply inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-accent px-4.5 text-sm font-semibold text-white shadow-xs transition-all hover:bg-accent-strong active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-55 disabled:active:scale-100 dark:text-[#041815];
+    background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(0, 0, 0, 0.04));
+    @apply inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-accent px-4.5 text-sm font-semibold text-white shadow-xs transition-all hover:-translate-y-px hover:bg-accent-strong hover:shadow-md active:translate-y-0 active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:translate-y-0 disabled:hover:shadow-none dark:text-[#041815];
   }
 
   .btn-quiet {
-    @apply inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-line bg-surface px-4 text-sm font-medium text-ink transition-all hover:border-line-strong hover:bg-surface-subtle active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-55 disabled:active:scale-100;
+    @apply inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-line bg-surface px-4 text-sm font-medium text-ink shadow-2xs transition-all hover:border-line-strong hover:bg-surface-subtle active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-55 disabled:active:scale-100;
   }
 
   .btn-danger {
@@ -102,7 +145,17 @@ body {
   .card {
     background: var(--bos-surface);
     box-shadow: var(--bos-shadow-card);
-    @apply rounded-2xl border border-line p-5 transition-colors sm:p-6;
+    @apply rounded-2xl border border-line p-5 transition-all sm:p-6;
+  }
+
+  .card-interactive {
+    background: var(--bos-surface);
+    box-shadow: var(--bos-shadow-card);
+    @apply rounded-2xl border border-line p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/50 sm:p-6;
+  }
+
+  .card-interactive:hover {
+    box-shadow: var(--bos-shadow-hover);
   }
 
   .card-subtle {
@@ -123,5 +176,13 @@ body {
 
   .icon-box {
     @apply inline-flex size-9 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent-strong;
+  }
+
+  .status-dot {
+    @apply inline-block size-2 shrink-0 rounded-full bg-accent;
+  }
+
+  .kbd {
+    @apply inline-flex items-center rounded-md border border-line bg-surface-subtle px-1.5 py-0.5 font-mono text-[10px] font-semibold text-muted;
   }
 }

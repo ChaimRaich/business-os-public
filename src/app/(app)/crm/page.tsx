@@ -1,21 +1,14 @@
 import type { Metadata } from "next";
-import { Mail, Phone, Plus, UserCheck, Users } from "lucide-react";
+import { ChevronDown, Plus, Users } from "lucide-react";
 import { requireBusiness } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { can } from "@/lib/permissions";
 import { CUSTOMER_STAGE_LABELS, CUSTOMER_STAGES, formatCurrency } from "@/lib/suite";
 import { ActionForm } from "@/components/action-form";
-import { createCustomer, deleteCustomer, updateCustomerStage } from "./actions";
+import { CrmDirectory } from "@/components/crm-directory";
+import { createCustomer } from "./actions";
 
 export const metadata: Metadata = { title: "לקוחות ו-CRM" };
-
-const STAGE_BADGES = {
-  lead: "bg-warning-soft text-warning",
-  prospect: "bg-surface-subtle text-ink",
-  active: "bg-accent-soft text-accent-strong",
-  vip: "bg-accent text-white dark:text-[#041815]",
-  inactive: "bg-surface-subtle text-muted",
-} as const;
 
 export default async function CrmPage() {
   const { active } = await requireBusiness();
@@ -68,136 +61,70 @@ export default async function CrmPage() {
         </div>
       </div>
 
-      {/* Add Customer */}
+      {/* Customer Directory + Collapsible Add Form */}
       <section className="card">
-        <h2 className="section-heading mb-4">
-          <Plus className="size-4.5 text-accent" aria-hidden />
-          <span>הוספת ליד / לקוח</span>
-        </h2>
-        <ActionForm
-          action={createCustomer}
-          submitLabel="שמירה ב-CRM"
-          submitClassName="btn sm:col-span-2 lg:col-span-3 sm:justify-self-start"
-          className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
-        >
-          <div>
-            <label className="label" htmlFor="cust-name">שם מלא</label>
-            <input className="field" id="cust-name" name="name" placeholder="נועה לוי" required />
-          </div>
-          <div>
-            <label className="label" htmlFor="cust-phone">טלפון</label>
-            <input className="field" id="cust-phone" name="phone" type="tel" dir="ltr" placeholder="050-0000000" />
-          </div>
-          <div>
-            <label className="label" htmlFor="cust-email">אימייל</label>
-            <input className="field" id="cust-email" name="email" type="email" dir="ltr" placeholder="noa@example.com" />
-          </div>
-          <div>
-            <label className="label" htmlFor="cust-stage">שלב</label>
-            <select className="field min-h-11" id="cust-stage" name="stage" defaultValue="lead">
-              {CUSTOMER_STAGES.map((stage) => (
-                <option key={stage} value={stage}>{CUSTOMER_STAGE_LABELS[stage]}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="label" htmlFor="cust-source">מקור הגעה</label>
-            <input className="field" id="cust-source" name="source" placeholder="Meta Ads / חנות / אתר" />
-          </div>
-          <div>
-            <label className="label" htmlFor="cust-ltv">שווי קניות מצטבר (₪)</label>
-            <input className="field tabular-nums" id="cust-ltv" name="lifetime_value" dir="ltr" inputMode="decimal" defaultValue="0" />
-          </div>
-        </ActionForm>
-      </section>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="section-heading">
+            <Users className="size-4.5 text-accent" aria-hidden />
+            <span>מאגר לקוחות ולידים</span>
+          </h2>
+        </div>
 
-      {/* Customer List */}
-      <section className="card">
-        <h2 className="section-heading mb-4">
-          <Users className="size-4.5 text-accent" aria-hidden />
-          <span>מאגר לקוחות ולידים</span>
-        </h2>
+        <details className="group mb-5" open={customers.length === 0}>
+          <summary className="btn-quiet inline-flex min-h-10 cursor-pointer list-none text-xs font-semibold">
+            <Plus className="size-4 text-accent" aria-hidden />
+            <span>הוספת ליד / לקוח חדש</span>
+            <ChevronDown className="size-4 text-muted transition-transform group-open:rotate-180" aria-hidden />
+          </summary>
+          <ActionForm
+            action={createCustomer}
+            submitLabel="שמירה ב-CRM"
+            submitClassName="btn sm:col-span-2 lg:col-span-3 sm:justify-self-start"
+            className="card-subtle mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
+          >
+            <div>
+              <label className="label" htmlFor="cust-name">שם מלא</label>
+              <input className="field" id="cust-name" name="name" placeholder="נועה לוי" required />
+            </div>
+            <div>
+              <label className="label" htmlFor="cust-phone">טלפון</label>
+              <input className="field" id="cust-phone" name="phone" type="tel" dir="ltr" placeholder="050-0000000" />
+            </div>
+            <div>
+              <label className="label" htmlFor="cust-email">אימייל</label>
+              <input className="field" id="cust-email" name="email" type="email" dir="ltr" placeholder="noa@example.com" />
+            </div>
+            <div>
+              <label className="label" htmlFor="cust-stage">שלב</label>
+              <select className="field min-h-11" id="cust-stage" name="stage" defaultValue="lead">
+                {CUSTOMER_STAGES.map((stage) => (
+                  <option key={stage} value={stage}>{CUSTOMER_STAGE_LABELS[stage]}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="label" htmlFor="cust-source">מקור הגעה</label>
+              <input className="field" id="cust-source" name="source" placeholder="Meta Ads / חנות / אתר" />
+            </div>
+            <div>
+              <label className="label" htmlFor="cust-ltv">שווי קניות מצטבר (₪)</label>
+              <input className="field tabular-nums" id="cust-ltv" name="lifetime_value" dir="ltr" inputMode="decimal" defaultValue="0" />
+            </div>
+          </ActionForm>
+        </details>
 
-        {customers.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-line bg-surface-subtle/40 px-4 py-10 text-center">
-            <UserCheck className="mb-3 size-8 text-muted" aria-hidden />
-            <p className="text-sm font-semibold text-ink">עוד אין לקוחות או לידים</p>
-            <p className="mt-1 text-xs text-muted">הוסיפו את איש הקשר הראשון למעלה כדי להתחיל לנהל קשרי לקוחות.</p>
-          </div>
-        ) : (
-          <ul className="divide-y divide-line">
-            {customers.map((customer) => {
-              const initial = (customer.name.trim()[0] ?? "ל").toUpperCase();
-              return (
-                <li key={customer.id} className="flex flex-wrap items-center gap-x-4 gap-y-3 py-3.5">
-                  <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-accent-soft text-sm font-bold text-accent-strong">
-                    {initial}
-                  </span>
-                  <div className="min-w-0 flex-1 basis-52">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-semibold text-ink">{customer.name}</span>
-                      <span className={`badge ${STAGE_BADGES[customer.stage]}`}>
-                        {CUSTOMER_STAGE_LABELS[customer.stage]}
-                      </span>
-                      {customer.source && (
-                        <span className="badge bg-surface-subtle text-muted">{customer.source}</span>
-                      )}
-                    </div>
-                    <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
-                      {customer.phone && (
-                        <span className="inline-flex items-center gap-1">
-                          <Phone className="size-3" aria-hidden />
-                          <bdi dir="ltr">{customer.phone}</bdi>
-                        </span>
-                      )}
-                      {customer.email && (
-                        <span className="inline-flex items-center gap-1">
-                          <Mail className="size-3" aria-hidden />
-                          <bdi dir="ltr">{customer.email}</bdi>
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="text-left">
-                    <span className="block text-[11px] text-muted">שווי מצטבר</span>
-                    <bdi dir="ltr" className="text-sm font-bold tabular-nums text-ink">
-                      {formatCurrency(Number(customer.lifetime_value))}
-                    </bdi>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <ActionForm
-                      action={updateCustomerStage}
-                      submitLabel="שמירה"
-                      submitClassName="btn-quiet min-h-9 px-3 text-xs"
-                      className="flex items-center gap-2"
-                    >
-                      <input type="hidden" name="id" value={customer.id} />
-                      <select
-                        className="field min-h-9 w-auto py-1 text-xs"
-                        name="stage"
-                        defaultValue={customer.stage}
-                        aria-label={`שלב של ${customer.name}`}
-                      >
-                        {CUSTOMER_STAGES.map((stage) => (
-                          <option key={stage} value={stage}>{CUSTOMER_STAGE_LABELS[stage]}</option>
-                        ))}
-                      </select>
-                    </ActionForm>
-                    {canDelete && (
-                      <ActionForm
-                        action={deleteCustomer}
-                        submitLabel="מחיקה"
-                        submitClassName="min-h-9 cursor-pointer px-2 text-xs font-medium text-danger hover:underline"
-                      >
-                        <input type="hidden" name="id" value={customer.id} />
-                      </ActionForm>
-                    )}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
+        <CrmDirectory
+          customers={customers.map((c) => ({
+            id: c.id,
+            name: c.name,
+            phone: c.phone,
+            email: c.email,
+            stage: c.stage,
+            source: c.source,
+            lifetime_value: Number(c.lifetime_value),
+          }))}
+          canDelete={canDelete}
+        />
       </section>
     </div>
   );

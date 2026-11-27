@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {
   ArrowUpLeft,
+  BarChart3,
   Building2,
   CheckCircle2,
   FileUp,
@@ -10,6 +11,7 @@ import {
   PlugZap,
   Plus,
   Sparkles,
+  TrendingUp,
   Users,
 } from "lucide-react";
 import { requireBusiness } from "@/lib/auth";
@@ -17,7 +19,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ROLE_LABELS } from "@/lib/permissions";
 import { DOCUMENT_STATUS_LABELS, DOCUMENT_TYPE_LABELS } from "@/lib/documents";
 import { INTEGRATION_CATEGORIES, isIntegrationReady } from "@/lib/integrations";
-import { formatCurrency } from "@/lib/suite";
+import { CUSTOMER_STAGE_LABELS, formatCurrency } from "@/lib/suite";
 
 const STATUS_BADGES = {
   uploaded: "bg-surface-subtle text-muted",
@@ -31,7 +33,7 @@ export default async function HomePage() {
   const { user, active } = await requireBusiness();
   const supabase = await createClient();
 
-  const count = async (table: "products" | "suppliers" | "documents" | "campaigns" | "customers") => {
+  const count = async (table: "products" | "documents") => {
     const { count: total, error } = await supabase
       .from(table)
       .select("id", { count: "exact", head: true })
@@ -42,35 +44,86 @@ export default async function HomePage() {
     return total ?? 0;
   };
 
-  const [products, documentsCount, campaignsCount, customersCount, recentResult, accountsResult, integrationsResult] =
-    await Promise.all([
-      count("products"),
-      count("documents"),
-      count("campaigns"),
-      count("customers"),
-      supabase
-        .from("documents")
-        .select("id, status, doc_type, doc_number, supplier_name_raw, created_at, suppliers (name)")
-        .eq("business_id", active.businessId)
-        .order("created_at", { ascending: false })
-        .limit(5),
-      supabase.from("finance_accounts").select("balance").eq("business_id", active.businessId),
-      supabase
-        .from("business_integrations")
-        .select("category, display_name, status")
-        .eq("business_id", active.businessId),
-    ]);
+  const [
+    products,
+    documentsCount,
+    recentResult,
+    accountsResult,
+    ledgerResult,
+    campaignsResult,
+    customersResult,
+    integrationsResult,
+  ] = await Promise.all([
+    count("products"),
+    count("documents"),
+    supabase
+      .from("documents")
+      .select("id, status, doc_type, doc_number, supplier_name_raw, created_at, suppliers (name)")
+      .eq("business_id", active.businessId)
+      .order("created_at", { ascending: false })
+      .limit(5),
+    supabase.from("finance_accounts").select("balance").eq("business_id", active.businessId),
+    supabase.from("ledger_entries").select("kind, status, amount").eq("business_id", active.businessId),
+    supabase.from("campaigns").select("status, budget, spent, leads_count, revenue").eq("business_id", active.businessId),
+    supabase.from("customers").select("stage, lifetime_value").eq("business_id", active.businessId),
+    supabase
+      .from("business_integrations")
+      .select("category, display_name, status")
+      .eq("business_id", active.businessId),
+  ]);
 
-  if (recentResult.error || accountsResult.error || integrationsResult.error) {
+  if (
+    recentResult.error ||
+    accountsResult.error ||
+    ledgerResult.error ||
+    campaignsResult.error ||
+    customersResult.error ||
+    integrationsResult.error
+  ) {
     throw new Error(
-      `Failed to load dashboard: ${(recentResult.error ?? accountsResult.error ?? integrationsResult.error)!.message}`,
+      `Failed to load dashboard: ${(
+        recentResult.error ??
+        accountsResult.error ??
+        ledgerResult.error ??
+        campaignsResult.error ??
+        customersResult.error ??
+        integrationsResult.error
+      )!.message}`,
     );
   }
 
   const recentDocuments = recentResult.data;
   const pendingReview = recentDocuments.filter((doc) => doc.status === "review").length;
   const totalBalance = accountsResult.data.reduce((sum, row) => sum + Number(row.balance), 0);
+
+  const ledgerIncome = ledgerResult.data
+    .filter((e) => e.kind === "income" || e.kind === "invoice")
+    .reduce((sum, e) => sum + Number(e.amount), 0);
+  const ledgerExpense = ledgerResult.data
+    .filter((e) => e.kind === "expense" || e.kind === "tax_payment")
+    .reduce((sum, e) => sum + Number(e.amount), 0);
+  const cashflowMax = Math.max(ledgerIncome, ledgerExpense, 1);
+
+  const campaigns = campaignsResult.data;
+  const activeCampaigns = campaigns.filter((c) => c.status === "active").length;
+  const campaignBudget = campaigns.reduce((sum, c) => sum + Number(c.budget), 0);
+  const campaignSpent = campaigns.reduce((sum, c) => sum + Number(c.spent), 0);
+  const campaignRevenue = campaigns.reduce((sum, c) => sum + Number(c.revenue), 0);
+  const campaignRoas = campaignSpent > 0 ? campaignRevenue / campaignSpent : 0;
+
+  const customers = customersResult.data;
+  const stageCounts = {
+    lead: customers.filter((c) => c.stage === "lead").length,
+    prospect: customers.filter((c) => c.stage === "prospect").length,
+    active: customers.filter((c) => c.stage === "active").length,
+    vip: customers.filter((c) => c.stage === "vip").length,
+  };
+  const funnelMax = Math.max(stageCounts.lead, stageCounts.prospect, stageCounts.active, stageCounts.vip, 1);
+
   const integrationsByCategory = new Map(integrationsResult.data.map((i) => [i.category, i]));
+  const connectedCount = INTEGRATION_CATEGORIES.filter((c) =>
+    isIntegrationReady(integrationsByCategory.get(c.id)?.status),
+  ).length;
   const dateFormatter = new Intl.DateTimeFormat("he-IL", { dateStyle: "short", timeZone: "Asia/Jerusalem" });
 
   const stats = [
@@ -92,9 +145,9 @@ export default async function HomePage() {
     {
       href: "/campaigns",
       label: "קמפיינים ולקוחות",
-      value: `${campaignsCount} / ${customersCount}`,
+      value: `${campaigns.length} / ${customers.length}`,
       icon: Megaphone,
-      note: "קמפיינים · אנשי קשר",
+      note: activeCampaigns > 0 ? `${activeCampaigns} קמפיינים פעילים` : "קמפיינים · CRM",
     },
   ];
 
@@ -127,42 +180,53 @@ export default async function HomePage() {
   ];
 
   return (
-    <div className="flex flex-col gap-7">
-      {/* Hero Header */}
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3 py-1 text-xs font-medium text-muted">
-            <Building2 className="size-3.5 text-accent" aria-hidden />
-            <span>{ROLE_LABELS[active.role]}</span>
-            <span className="text-line-strong">·</span>
-            <bdi dir="ltr">{user.email}</bdi>
+    <div className="flex flex-col gap-6">
+      {/* Executive Welcome Hero */}
+      <section className="card relative overflow-hidden p-5 sm:p-6">
+        <div
+          className="pointer-events-none absolute inset-0 opacity-60 dark:opacity-35"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle at 8% 15%, color-mix(in srgb, var(--bos-accent) 18%, transparent), transparent 46%)",
+          }}
+          aria-hidden
+        />
+        <div className="relative flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <div className="mb-2.5 flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface/90 px-3 py-1 text-xs font-medium text-muted">
+                <Building2 className="size-3.5 text-accent" aria-hidden />
+                <span>{ROLE_LABELS[active.role]}</span>
+                <span className="text-line-strong">·</span>
+                <bdi dir="ltr">{user.email}</bdi>
+              </span>
+              <Link
+                href="/integrations"
+                className="inline-flex items-center gap-1.5 rounded-full border border-accent/25 bg-accent-soft px-3 py-1 text-xs font-semibold text-accent-strong transition-opacity hover:opacity-90"
+              >
+                <span className="status-dot animate-pulse" aria-hidden />
+                <span>{connectedCount}/{INTEGRATION_CATEGORIES.length} אינטגרציות פעילות</span>
+              </Link>
+            </div>
+            <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">{active.businessName}</h1>
+            <p className="mt-1 text-sm text-muted">
+              מרכז השליטה העסקי — מלאי, כספים, שיווק ולקוחות בתצוגה אחת.
+            </p>
           </div>
-          <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">{active.businessName}</h1>
+          <div className="flex flex-wrap gap-2.5">
+            <Link href="/integrations" className="btn-quiet">
+              <PlugZap className="size-4 text-accent" aria-hidden />
+              <span>אינטגרציות</span>
+            </Link>
+            <Link href="/receiving/new" className="btn">
+              <Plus className="size-4" aria-hidden />
+              <span>קליטה חדשה</span>
+            </Link>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2.5">
-          <Link href="/integrations" className="btn-quiet">
-            <PlugZap className="size-4 text-accent" aria-hidden />
-            <span>אינטגרציות</span>
-          </Link>
-          <Link href="/receiving/new" className="btn">
-            <Plus className="size-4" aria-hidden />
-            <span>קליטה חדשה</span>
-          </Link>
-        </div>
-      </div>
 
-      {/* Integration Health Strip */}
-      <section className="card p-4">
-        <div className="mb-3 flex items-center justify-between gap-2">
-          <span className="flex items-center gap-2 text-xs font-bold text-muted">
-            <PlugZap className="size-3.5 text-accent" aria-hidden />
-            <span>מערכות מחוברות לעסק</span>
-          </span>
-          <Link href="/integrations" className="text-xs font-semibold text-accent hover:underline">
-            ניהול חיבורים
-          </Link>
-        </div>
-        <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
+        {/* Connected systems strip */}
+        <div className="relative mt-5 grid grid-cols-2 gap-2.5 border-t border-line/80 pt-4 lg:grid-cols-4">
           {INTEGRATION_CATEGORIES.map((category) => {
             const row = integrationsByCategory.get(category.id);
             const ready = isIntegrationReady(row?.status);
@@ -170,7 +234,7 @@ export default async function HomePage() {
               <Link
                 key={category.id}
                 href="/integrations"
-                className="flex items-center gap-2.5 rounded-xl border border-line bg-surface-subtle/50 px-3 py-2.5 transition-colors hover:border-accent/50"
+                className="flex items-center gap-2.5 rounded-xl border border-line/80 bg-surface-subtle/50 px-3 py-2 transition-colors hover:border-accent/50 hover:bg-surface"
               >
                 <CheckCircle2
                   className={`size-4 shrink-0 ${ready ? "text-accent" : "text-muted/50"}`}
@@ -196,7 +260,7 @@ export default async function HomePage() {
             <Link
               key={stat.href}
               href={stat.href}
-              className="card group flex flex-col justify-between gap-4 p-4 transition-all hover:-translate-y-0.5 hover:border-accent/50 sm:p-5"
+              className="card-interactive group flex flex-col justify-between gap-4 p-4 sm:p-5"
             >
               <div className="flex items-center justify-between gap-2">
                 <span className="icon-box transition-transform group-hover:scale-105">
@@ -226,6 +290,128 @@ export default async function HomePage() {
         })}
       </div>
 
+      {/* Visual Business Pulse: Finance, Campaigns, CRM */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        {/* Finance Pulse */}
+        <section className="card flex flex-col justify-between gap-4 p-5">
+          <div className="flex items-center justify-between">
+            <h2 className="flex items-center gap-2 text-sm font-bold text-ink">
+              <BarChart3 className="size-4 text-accent" aria-hidden />
+              <span>תזרים והנה״ח</span>
+            </h2>
+            <Link href="/finance" className="text-xs font-semibold text-accent hover:underline">
+              למסך כספים
+            </Link>
+          </div>
+          <div className="flex flex-col gap-3">
+            <div>
+              <div className="mb-1 flex items-center justify-between text-xs">
+                <span className="text-muted">הכנסות וחשבוניות</span>
+                <bdi dir="ltr" className="font-bold tabular-nums text-accent-strong">{formatCurrency(ledgerIncome)}</bdi>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-surface-subtle">
+                <div
+                  className="h-full rounded-full bg-accent transition-all duration-500"
+                  style={{ width: `${ledgerIncome > 0 ? Math.max(8, Math.round((ledgerIncome / cashflowMax) * 100)) : 0}%` }}
+                />
+              </div>
+            </div>
+            <div>
+              <div className="mb-1 flex items-center justify-between text-xs">
+                <span className="text-muted">הוצאות ותשלומי מס</span>
+                <bdi dir="ltr" className="font-bold tabular-nums text-ink">{formatCurrency(ledgerExpense)}</bdi>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-surface-subtle">
+                <div
+                  className="h-full rounded-full bg-danger/80 transition-all duration-500"
+                  style={{ width: `${ledgerExpense > 0 ? Math.max(8, Math.round((ledgerExpense / cashflowMax) * 100)) : 0}%` }}
+                />
+              </div>
+            </div>
+          </div>
+          <p className="border-t border-line pt-3 text-xs text-muted">
+            נטו תפעולי:{" "}
+            <bdi dir="ltr" className={`font-bold tabular-nums ${ledgerIncome - ledgerExpense >= 0 ? "text-accent-strong" : "text-danger"}`}>
+              {formatCurrency(ledgerIncome - ledgerExpense)}
+            </bdi>
+          </p>
+        </section>
+
+        {/* Campaigns Pulse */}
+        <section className="card flex flex-col justify-between gap-4 p-5">
+          <div className="flex items-center justify-between">
+            <h2 className="flex items-center gap-2 text-sm font-bold text-ink">
+              <TrendingUp className="size-4 text-accent" aria-hidden />
+              <span>ביצועי קמפיינים</span>
+            </h2>
+            <Link href="/campaigns" className="text-xs font-semibold text-accent hover:underline">
+              לקמפיינים
+            </Link>
+          </div>
+          <div className="flex items-baseline justify-between gap-2">
+            <div>
+              <span className="block text-xs text-muted">החזר השקעה (ROAS)</span>
+              <span className="mt-0.5 block text-2xl font-extrabold tabular-nums text-accent-strong">
+                {campaignRoas > 0 ? `${campaignRoas.toFixed(1)}x` : "—"}
+              </span>
+            </div>
+            <div className="text-left">
+              <span className="block text-xs text-muted">הכנסות מיוחסות</span>
+              <bdi dir="ltr" className="mt-0.5 block text-sm font-bold tabular-nums text-ink">
+                {formatCurrency(campaignRevenue)}
+              </bdi>
+            </div>
+          </div>
+          <div>
+            <div className="mb-1 flex items-center justify-between text-xs text-muted">
+              <span>ניצול תקציב פרסום</span>
+              <span className="tabular-nums">
+                {campaignBudget > 0 ? `${Math.min(100, Math.round((campaignSpent / campaignBudget) * 100))}%` : "0%"}
+              </span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-surface-subtle">
+              <div
+                className="h-full rounded-full bg-accent transition-all duration-500"
+                style={{ width: `${campaignBudget > 0 ? Math.min(100, Math.round((campaignSpent / campaignBudget) * 100)) : 0}%` }}
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* CRM Funnel Pulse */}
+        <section className="card flex flex-col justify-between gap-4 p-5">
+          <div className="flex items-center justify-between">
+            <h2 className="flex items-center gap-2 text-sm font-bold text-ink">
+              <Users className="size-4 text-accent" aria-hidden />
+              <span>משפך לקוחות (CRM)</span>
+            </h2>
+            <Link href="/crm" className="text-xs font-semibold text-accent hover:underline">
+              ל-CRM
+            </Link>
+          </div>
+          <div className="flex flex-col gap-2">
+            {(["lead", "prospect", "active", "vip"] as const).map((stage) => {
+              const value = stageCounts[stage];
+              const pct = value > 0 ? Math.max(10, Math.round((value / funnelMax) * 100)) : 0;
+              return (
+                <div key={stage} className="flex items-center gap-2.5 text-xs">
+                  <span className="w-20 shrink-0 truncate text-muted">{CUSTOMER_STAGE_LABELS[stage]}</span>
+                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-surface-subtle">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        stage === "vip" ? "bg-accent" : stage === "active" ? "bg-accent/75" : stage === "lead" ? "bg-warning" : "bg-muted/60"
+                      }`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  <span className="w-6 text-left font-bold tabular-nums text-ink">{value}</span>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      </div>
+
       {/* Main two-column workspace */}
       <div className="grid gap-6 lg:grid-cols-12">
         {/* Quick Actions */}
@@ -233,7 +419,7 @@ export default async function HomePage() {
           <div className="mb-4 flex items-center justify-between">
             <h2 className="section-heading">
               <Sparkles className="size-4.5 text-accent" aria-hidden />
-              <span>ניהול העסק מקצה לקצה</span>
+              <span>פעולות מהירות</span>
             </h2>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">

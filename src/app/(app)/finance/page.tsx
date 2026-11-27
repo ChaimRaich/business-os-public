@@ -3,6 +3,8 @@ import Link from "next/link";
 import {
   ArrowDownLeft,
   ArrowUpRight,
+  BarChart3,
+  ChevronDown,
   CreditCard,
   Landmark,
   PlugZap,
@@ -74,6 +76,9 @@ export default async function FinancePage() {
   const totalIncome = entries
     .filter((e) => (e.kind === "income" || e.kind === "invoice") && e.status === "paid")
     .reduce((sum, e) => sum + Number(e.amount), 0);
+  const pendingIncome = entries
+    .filter((e) => (e.kind === "income" || e.kind === "invoice") && e.status !== "paid")
+    .reduce((sum, e) => sum + Number(e.amount), 0);
   const totalExpenses = entries
     .filter((e) => e.kind === "expense" || e.kind === "tax_payment")
     .reduce((sum, e) => sum + Number(e.amount), 0);
@@ -82,6 +87,7 @@ export default async function FinancePage() {
     return e.kind === "income" || e.kind === "invoice" ? sum + vat : sum - vat;
   }, 0);
 
+  const flowMax = Math.max(totalIncome, totalExpenses, pendingIncome, 1);
   const dateFmt = new Intl.DateTimeFormat("he-IL", { dateStyle: "short", timeZone: "Asia/Jerusalem" });
 
   return (
@@ -103,29 +109,35 @@ export default async function FinancePage() {
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="card-subtle flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
-            <Landmark className="size-4.5 text-accent" aria-hidden />
+            <span className="icon-box size-8">
+              <Landmark className="size-4" aria-hidden />
+            </span>
             <div>
-              <p className="text-xs text-muted">ממשק הנהלת חשבונות / רו״ח</p>
+              <p className="text-[11px] text-muted">ממשק הנהלת חשבונות / רו״ח</p>
               <p className="text-sm font-bold text-ink">{accountingInt?.display_name ?? "לא הוגדר"}</p>
             </div>
           </div>
           {accountingInt && (
             <span className="badge bg-accent-soft text-accent-strong">
-              {INTEGRATION_STATUS_LABELS[accountingInt.status]}
+              <span className="status-dot" aria-hidden />
+              <span>{INTEGRATION_STATUS_LABELS[accountingInt.status]}</span>
             </span>
           )}
         </div>
         <div className="card-subtle flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
-            <CreditCard className="size-4.5 text-accent" aria-hidden />
+            <span className="icon-box size-8">
+              <CreditCard className="size-4" aria-hidden />
+            </span>
             <div>
-              <p className="text-xs text-muted">ממשק סליקה ובנקים</p>
+              <p className="text-[11px] text-muted">ממשק סליקה ובנקים</p>
               <p className="text-sm font-bold text-ink">{paymentsInt?.display_name ?? "לא הוגדר"}</p>
             </div>
           </div>
           {paymentsInt && (
             <span className="badge bg-accent-soft text-accent-strong">
-              {INTEGRATION_STATUS_LABELS[paymentsInt.status]}
+              <span className="status-dot" aria-hidden />
+              <span>{INTEGRATION_STATUS_LABELS[paymentsInt.status]}</span>
             </span>
           )}
         </div>
@@ -171,20 +183,53 @@ export default async function FinancePage() {
         </div>
       </div>
 
-      {/* Accounts */}
+      {/* Visual Cashflow Bar Breakdown */}
       <section className="card">
         <h2 className="section-heading mb-4">
-          <Landmark className="size-4.5 text-accent" aria-hidden />
-          <span>חשבונות בנק, סליקה וקופות</span>
+          <BarChart3 className="size-4.5 text-accent" aria-hidden />
+          <span>פילוח תזרים</span>
         </h2>
+        <div className="grid gap-4 sm:grid-cols-3">
+          {[
+            { label: "הכנסות שנגבו", amount: totalIncome, bar: "bg-accent", text: "text-accent-strong" },
+            { label: "חשבוניות פתוחות לגבייה", amount: pendingIncome, bar: "bg-warning", text: "text-warning" },
+            { label: "הוצאות ותשלומי מס", amount: totalExpenses, bar: "bg-danger/80", text: "text-danger" },
+          ].map((row) => (
+            <div key={row.label} className="rounded-xl border border-line bg-surface-subtle/40 p-3.5">
+              <div className="mb-2 flex items-center justify-between text-xs">
+                <span className="font-medium text-muted">{row.label}</span>
+                <bdi dir="ltr" className={`font-bold tabular-nums ${row.text}`}>{formatCurrency(row.amount)}</bdi>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-line/70">
+                <div
+                  className={`h-full rounded-full ${row.bar} transition-all duration-500`}
+                  style={{ width: `${row.amount > 0 ? Math.max(8, Math.round((row.amount / flowMax) * 100)) : 0}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Accounts */}
+      <section className="card">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="section-heading">
+            <Landmark className="size-4.5 text-accent" aria-hidden />
+            <span>חשבונות בנק, סליקה וקופות ({accounts.length})</span>
+          </h2>
+        </div>
         {accounts.length === 0 ? (
           <p className="rounded-xl bg-surface-subtle/60 px-4 py-3 text-sm text-muted">
             עוד לא הוגדרו חשבונות. הוסיפו חשבון בנק, מסוף סליקה או קופה לניהול התזרים.
           </p>
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
             {accounts.map((account) => (
-              <div key={account.id} className="rounded-xl border border-line bg-surface-subtle/40 p-4">
+              <div
+                key={account.id}
+                className="relative overflow-hidden rounded-2xl border border-line bg-surface-subtle/40 p-4 transition-all hover:border-accent/45"
+              >
                 <div className="flex items-center justify-between gap-2">
                   <span className="badge bg-surface text-muted">
                     {ACCOUNT_TYPE_LABELS[account.account_type as AccountType] ?? account.account_type}
@@ -193,9 +238,9 @@ export default async function FinancePage() {
                     <bdi dir="ltr" className="font-mono text-xs text-muted">••{account.account_number_last4}</bdi>
                   )}
                 </div>
-                <p className="mt-2.5 font-bold text-ink">{account.name}</p>
+                <p className="mt-3 font-bold text-ink">{account.name}</p>
                 {account.institution && <p className="text-xs text-muted">{account.institution}</p>}
-                <bdi dir="ltr" className="mt-3 block text-right text-lg font-extrabold tabular-nums text-ink">
+                <bdi dir="ltr" className="mt-3 block text-right text-xl font-extrabold tabular-nums text-ink">
                   {formatCurrency(Number(account.balance))}
                 </bdi>
               </div>
@@ -204,12 +249,13 @@ export default async function FinancePage() {
         )}
 
         {canManage && (
-          <div className="mt-5 border-t border-line pt-5">
-            <h3 className="mb-3 flex items-center gap-1.5 text-sm font-bold text-ink">
-              <Plus className="size-4 text-accent" aria-hidden />
-              <span>הוספת חשבון</span>
-            </h3>
-            <ActionForm action={createFinanceAccount} submitLabel="הוספת חשבון" submitClassName="btn-quiet sm:self-end" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <details className="group mt-5 border-t border-line pt-4" open={accounts.length === 0}>
+            <summary className="inline-flex cursor-pointer list-none items-center gap-2 text-sm font-bold text-accent hover:underline">
+              <Plus className="size-4" aria-hidden />
+              <span>הוספת חשבון בנק / סליקה</span>
+              <ChevronDown className="size-4 transition-transform group-open:rotate-180" aria-hidden />
+            </summary>
+            <ActionForm action={createFinanceAccount} submitLabel="הוספת חשבון" submitClassName="btn sm:self-end" className="card-subtle mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
               <div>
                 <label className="label" htmlFor="acc-name">שם החשבון</label>
                 <input className="field" id="acc-name" name="name" placeholder="עו״ש עסקי" required />
@@ -231,74 +277,83 @@ export default async function FinancePage() {
                 <input className="field tabular-nums" id="acc-bal" name="balance" dir="ltr" inputMode="decimal" defaultValue="0" />
               </div>
             </ActionForm>
-          </div>
+          </details>
         )}
       </section>
 
       {/* Ledger */}
       <section className="card">
-        <h2 className="section-heading mb-4">
-          <Receipt className="size-4.5 text-accent" aria-hidden />
-          <span>יומן תנועות, חשבוניות וראיית חשבון</span>
-        </h2>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="section-heading">
+            <Receipt className="size-4.5 text-accent" aria-hidden />
+            <span>יומן תנועות, חשבוניות וראיית חשבון ({entries.length})</span>
+          </h2>
+        </div>
 
         {canManage && (
-          <ActionForm
-            action={createLedgerEntry}
-            submitLabel="רישום תנועה"
-            submitClassName="btn sm:col-span-2 lg:col-span-4 sm:justify-self-start"
-            className="card-subtle mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
-          >
-            <div>
-              <label className="label" htmlFor="entry-kind">סוג תנועה</label>
-              <select className="field min-h-11" id="entry-kind" name="kind" defaultValue="invoice">
-                {LEDGER_KINDS.map((k) => (
-                  <option key={k} value={k}>{LEDGER_KIND_LABELS[k]}</option>
-                ))}
-              </select>
-            </div>
-            <div className="sm:col-span-2">
-              <label className="label" htmlFor="entry-title">תיאור</label>
-              <input className="field" id="entry-title" name="title" placeholder="חשבונית ספק / מכירה יומית / מקדמת מע״מ" required />
-            </div>
-            <div>
-              <label className="label" htmlFor="entry-status">סטטוס</label>
-              <select className="field min-h-11" id="entry-status" name="status" defaultValue="pending">
-                {LEDGER_STATUSES.map((s) => (
-                  <option key={s} value={s}>{LEDGER_STATUS_LABELS[s]}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="label" htmlFor="entry-counterparty">לקוח / ספק / רשות</label>
-              <input className="field" id="entry-counterparty" name="counterparty" placeholder="שם הגורם" />
-            </div>
-            <div>
-              <label className="label" htmlFor="entry-ref">מספר מסמך / אסמכתא</label>
-              <input className="field font-mono text-sm" id="entry-ref" name="reference_number" dir="ltr" placeholder="INV-1001" />
-            </div>
-            <div>
-              <label className="label" htmlFor="entry-amount">סכום כולל (₪)</label>
-              <input className="field tabular-nums" id="entry-amount" name="amount" dir="ltr" inputMode="decimal" required />
-            </div>
-            <div>
-              <label className="label" htmlFor="entry-vat">מתוכו מע״מ (₪)</label>
-              <input className="field tabular-nums" id="entry-vat" name="vat_amount" dir="ltr" inputMode="decimal" defaultValue="0" />
-            </div>
-            <div>
-              <label className="label" htmlFor="entry-account">חשבון</label>
-              <select className="field min-h-11" id="entry-account" name="account_id" defaultValue="">
-                <option value="">ללא שיוך</option>
-                {accounts.map((a) => (
-                  <option key={a.id} value={a.id}>{a.name}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="label" htmlFor="entry-date">תאריך</label>
-              <input className="field" id="entry-date" name="entry_date" type="date" />
-            </div>
-          </ActionForm>
+          <details className="group mb-5" open={entries.length === 0}>
+            <summary className="btn-quiet inline-flex min-h-10 cursor-pointer list-none text-xs font-semibold">
+              <Plus className="size-4 text-accent" aria-hidden />
+              <span>רישום תנועה / חשבונית חדשה</span>
+              <ChevronDown className="size-4 text-muted transition-transform group-open:rotate-180" aria-hidden />
+            </summary>
+            <ActionForm
+              action={createLedgerEntry}
+              submitLabel="רישום תנועה"
+              submitClassName="btn sm:col-span-2 lg:col-span-4 sm:justify-self-start"
+              className="card-subtle mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
+            >
+              <div>
+                <label className="label" htmlFor="entry-kind">סוג תנועה</label>
+                <select className="field min-h-11" id="entry-kind" name="kind" defaultValue="invoice">
+                  {LEDGER_KINDS.map((k) => (
+                    <option key={k} value={k}>{LEDGER_KIND_LABELS[k]}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="sm:col-span-2">
+                <label className="label" htmlFor="entry-title">תיאור</label>
+                <input className="field" id="entry-title" name="title" placeholder="חשבונית ספק / מכירה יומית / מקדמת מע״מ" required />
+              </div>
+              <div>
+                <label className="label" htmlFor="entry-status">סטטוס</label>
+                <select className="field min-h-11" id="entry-status" name="status" defaultValue="pending">
+                  {LEDGER_STATUSES.map((s) => (
+                    <option key={s} value={s}>{LEDGER_STATUS_LABELS[s]}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="label" htmlFor="entry-counterparty">לקוח / ספק / רשות</label>
+                <input className="field" id="entry-counterparty" name="counterparty" placeholder="שם הגורם" />
+              </div>
+              <div>
+                <label className="label" htmlFor="entry-ref">מספר מסמך / אסמכתא</label>
+                <input className="field font-mono text-sm" id="entry-ref" name="reference_number" dir="ltr" placeholder="INV-1001" />
+              </div>
+              <div>
+                <label className="label" htmlFor="entry-amount">סכום כולל (₪)</label>
+                <input className="field tabular-nums" id="entry-amount" name="amount" dir="ltr" inputMode="decimal" required />
+              </div>
+              <div>
+                <label className="label" htmlFor="entry-vat">מתוכו מע״מ (₪)</label>
+                <input className="field tabular-nums" id="entry-vat" name="vat_amount" dir="ltr" inputMode="decimal" defaultValue="0" />
+              </div>
+              <div>
+                <label className="label" htmlFor="entry-account">חשבון</label>
+                <select className="field min-h-11" id="entry-account" name="account_id" defaultValue="">
+                  <option value="">ללא שיוך</option>
+                  {accounts.map((a) => (
+                    <option key={a.id} value={a.id}>{a.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="label" htmlFor="entry-date">תאריך</label>
+                <input className="field" id="entry-date" name="entry_date" type="date" />
+              </div>
+            </ActionForm>
+          </details>
         )}
 
         {entries.length === 0 ? (

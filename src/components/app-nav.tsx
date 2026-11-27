@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
 import { BusinessSwitcher } from "@/components/business-switcher";
+import { CommandPaletteTrigger } from "@/components/command-palette";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 const NAV_GROUPS = [
@@ -90,19 +91,21 @@ export function AppShell({
   return (
     <div className="flex min-h-full flex-1 flex-col md:flex-row">
       {/* Desktop RTL Sidebar */}
-      <aside className="hidden md:sticky md:top-0 md:flex md:h-screen md:w-68 md:shrink-0 md:flex-col md:border-e md:border-line md:bg-surface">
-        <div className="flex flex-col gap-4 border-b border-line p-5">
+      <aside className="hidden md:sticky md:top-0 md:flex md:h-screen md:w-70 md:shrink-0 md:flex-col md:border-e md:border-line md:bg-surface/95 md:backdrop-blur-md">
+        <div className="flex flex-col gap-3.5 border-b border-line p-5">
           <Link href="/" className="transition-opacity hover:opacity-90">
             <BrandMark />
           </Link>
           {businesses.length > 1 ? (
             <BusinessSwitcher action={switchBusiness} activeId={activeBusiness.id} businesses={businesses} />
           ) : (
-            <div className="flex items-center gap-2.5 rounded-xl border border-line bg-surface-subtle/70 px-3 py-2.5">
+            <div className="flex items-center gap-2.5 rounded-xl border border-line bg-surface-subtle/70 px-3 py-2">
               <Building2 className="size-4 shrink-0 text-accent" aria-hidden />
               <span className="truncate text-sm font-semibold text-ink">{activeBusiness.name}</span>
+              <span className="status-dot ms-auto" title="מחובר" />
             </div>
           )}
+          <CommandPaletteTrigger />
         </div>
 
         <div className="flex flex-1 flex-col gap-5 overflow-y-auto p-4">
@@ -114,7 +117,7 @@ export function AppShell({
           <nav aria-label="ניווט ראשי" className="flex flex-col gap-5">
             {NAV_GROUPS.map((group) => (
               <div key={group.label} className="flex flex-col gap-1">
-                <p className="px-3 pb-1 text-[11px] font-bold tracking-wider text-muted/80">{group.label}</p>
+                <p className="px-3 pb-1 text-[11px] font-bold tracking-wider text-muted/75">{group.label}</p>
                 {group.items.map((item) => {
                   const Icon = item.icon;
                   const active = isActive(item.href, "exact" in item ? item.exact : false);
@@ -123,12 +126,18 @@ export function AppShell({
                       key={item.href}
                       href={item.href}
                       aria-current={active ? "page" : undefined}
-                      className={`flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-all ${
+                      className={`relative flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-all ${
                         active
-                          ? "bg-accent-soft font-semibold text-accent-strong"
+                          ? "bg-accent-soft font-semibold text-accent-strong shadow-2xs"
                           : "text-muted hover:bg-surface-subtle hover:text-ink"
                       }`}
                     >
+                      {active && (
+                        <span
+                          className="absolute start-0 top-2 bottom-2 w-1 rounded-e-full bg-accent"
+                          aria-hidden
+                        />
+                      )}
                       <Icon className={`size-4.5 shrink-0 ${active ? "text-accent" : ""}`} aria-hidden />
                       <span>{item.label}</span>
                     </Link>
@@ -140,12 +149,12 @@ export function AppShell({
         </div>
 
         <div className="flex flex-col gap-3 border-t border-line p-4">
-          <div className="flex items-center gap-3 rounded-xl bg-surface-subtle/60 px-3 py-2.5">
-            <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-accent-soft text-xs font-bold text-accent-strong">
+          <div className="flex items-center gap-3 rounded-xl border border-line/70 bg-surface-subtle/50 px-3 py-2.5">
+            <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-bold text-white dark:text-[#041815]">
               {initial}
             </span>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-medium text-ink" dir="ltr">
+              <p className="truncate text-xs font-semibold text-ink" dir="ltr">
                 {userEmail}
               </p>
               <p className="text-[11px] text-muted">{roleLabel}</p>
@@ -178,7 +187,7 @@ export function AppShell({
             {businesses.length > 1 ? (
               <BusinessSwitcher action={switchBusiness} activeId={activeBusiness.id} businesses={businesses} />
             ) : (
-              <span className="block truncate ps-1 text-xs font-medium text-muted">{activeBusiness.name}</span>
+              <span className="block truncate ps-1 text-xs font-semibold text-muted">{activeBusiness.name}</span>
             )}
           </div>
           <ThemeToggle className="px-2.5" />
@@ -212,7 +221,7 @@ export function AppShell({
       </header>
 
       {/* Main Content */}
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 pt-6 pb-24 sm:px-6 md:px-8 md:py-8">
+      <main className="page-enter mx-auto w-full max-w-5xl flex-1 px-4 pt-6 pb-24 sm:px-6 md:px-8 md:py-8">
         {children}
       </main>
 

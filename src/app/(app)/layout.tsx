@@ -8,6 +8,9 @@ import { AppShell } from "@/components/app-nav";
 import { logout } from "../(auth)/actions";
 import { switchBusiness } from "./actions";
 
+// The app shell gates children behind business creation and mandatory integration onboarding.
+export const instant = false;
+
 export default function AppLayout({ children }: LayoutProps<"/">) {
   return (
     <Suspense

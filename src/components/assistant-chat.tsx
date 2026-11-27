@@ -2,6 +2,7 @@
 
 import { Boxes, ChevronRight, Megaphone, ShoppingBag, Star, Truck, Users, Wallet, type LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent, type KeyboardEvent } from "react";
+import { usePathname } from "next/navigation";
 import { LogoTile } from "@/components/logo";
 import { channelById, channelsFor, isChannelId, type ChannelId } from "@/lib/assistant-channels";
 
@@ -185,21 +186,40 @@ function ChannelAvatar({ id }: { id: ChannelId }) {
   );
 }
 
-/**
- * The business chats: a text bar in the corner that grows into a messaging-style panel.
- * One main chat knows the whole business, and every area has a chat of its own.
- */
-export function AssistantChat({
-  businessName,
-  businessId,
-  userId,
-  canManage,
-}: {
+/** The workers page has the chats in full, so the corner bar steps aside there. */
+export const WORKERS_PATH = "/workers";
+
+type ChatProps = {
   businessName: string;
   businessId: string;
   userId: string;
   canManage: boolean;
-}) {
+};
+
+/** The corner bar that grows into the chats panel. Hidden on the workers page, which shows them in full. */
+export function AssistantChat(props: ChatProps) {
+  const pathname = usePathname();
+  if (pathname === WORKERS_PATH || pathname.startsWith(`${WORKERS_PATH}/`)) return null;
+  return <Chats {...props} variant="floating" />;
+}
+
+/** The workers page: the same chats, laid out in the page instead of floating in the corner. */
+export function WorkersChats(props: ChatProps) {
+  return <Chats {...props} variant="page" />;
+}
+
+/**
+ * The business chats, each one a worker of the business: one main chat knows the whole
+ * business, and every area has a chat of its own. Both layouts share the conversations.
+ */
+function Chats({
+  businessName,
+  businessId,
+  userId,
+  canManage,
+  variant,
+}: ChatProps & { variant: "floating" | "page" }) {
+  const inPage = variant === "page";
   const storageKey = `${STORAGE_PREFIX}${userId}:${businessId}`;
   const allChats = useSyncExternalStore(
     subscribe,
@@ -208,11 +228,12 @@ export function AssistantChat({
   );
   const channels = channelsFor(canManage);
 
-  const [open, setOpen] = useState(false);
-  const [openedAt, setOpenedAt] = useState(0);
+  const [open, setOpen] = useState(inPage);
+  const [openedAt, setOpenedAt] = useState(() => (inPage ? Date.now() : 0));
   const [active, setActive] = useState<ChannelId>("main");
   // Narrow screens show one pane at a time; wide screens show the list beside the conversation.
-  const [view, setView] = useState<"list" | "chat">("chat");
+  // The page opens on the list of workers; the corner panel opens on the conversation.
+  const [view, setView] = useState<"list" | "chat">(inPage ? "list" : "chat");
   const [pending, setPending] = useState<ChannelId[]>([]);
   const [unread, setUnread] = useState<ChannelId[]>([]);
   /** The answer that is being revealed right now, by its timestamp. */
@@ -239,7 +260,12 @@ export function AssistantChat({
   // Opening moves the caret into the panel, after whatever was typed in the bar;
   // closing hands focus back to the bar.
   const wasOpen = useRef(false);
+  const mounted = useRef(false);
   useEffect(() => {
+    // The page does not grab the caret on arrival, only once a worker is picked.
+    const arriving = !mounted.current;
+    mounted.current = true;
+    if (inPage && (arriving || view !== "chat")) return;
     if (open) {
       const field = input.current;
       field?.focus();
@@ -248,7 +274,7 @@ export function AssistantChat({
       launcher.current?.focus();
     }
     wasOpen.current = open;
-  }, [open, active, view]);
+  }, [open, active, view, inPage]);
 
   useEffect(() => {
     log.current?.scrollTo({ top: log.current.scrollHeight, behavior: "smooth" });
@@ -273,7 +299,9 @@ export function AssistantChat({
     setUnread((current) => current.filter((id) => id !== active));
   };
 
-  const close = () => setOpen(false);
+  const close = () => {
+    if (!inPage) setOpen(false);
+  };
 
   const pick = (id: ChannelId) => {
     setActive(id);
@@ -337,8 +365,11 @@ export function AssistantChat({
   const whatsappHref = `https://wa.me/?text=${encodeURIComponent(transcript(shareHeading, entries, WHATSAPP_LIMIT))}`;
   const mailHref = `mailto:?subject=${encodeURIComponent(shareHeading)}&body=${encodeURIComponent(transcript(shareHeading, entries, MAIL_LIMIT))}`;
 
+  const inputId = `${variant}-assistant-input`;
+
   return (
     <>
+      {!inPage && (
       <form
         className="chat-launcher"
         data-open={open}
@@ -380,26 +411,29 @@ export function AssistantChat({
           </svg>
         </button>
       </form>
+      )}
 
       <section
-        id="assistant-panel"
-        className="chat-panel"
+        id={`${variant}-assistant-panel`}
+        className={inPage ? "chat-panel is-page" : "chat-panel"}
         data-open={open}
         data-view={view}
-        role="dialog"
-        aria-label={`הצ׳אטים של ${businessName}`}
+        role={inPage ? "region" : "dialog"}
+        aria-label={inPage ? `העובדים של ${businessName}` : `הצ׳אטים של ${businessName}`}
         aria-hidden={!open}
         inert={!open}
         onKeyDown={(event) => {
           if (event.key === "Escape") close();
         }}
       >
-        <nav className="chat-list" aria-label="הצ׳אטים של העסק">
+        <nav className="chat-list" aria-label={inPage ? "העובדים" : "הצ׳אטים של העסק"}>
           <div className="chat-list-head">
-            <p className="font-medium">הצ׳אטים של העסק</p>
-            <button type="button" className="chat-head-btn chat-narrow-only" onClick={close} aria-label="סגירת הצ׳אט" title="סגירה">
-              <CloseIcon />
-            </button>
+            <p className="font-medium">{inPage ? "העובדים" : "הצ׳אטים של העסק"}</p>
+            {!inPage && (
+              <button type="button" className="chat-head-btn chat-narrow-only" onClick={close} aria-label="סגירת הצ׳אט" title="סגירה">
+                <CloseIcon />
+              </button>
+            )}
           </div>
           <ul className="chat-rows">
             {channels.map((item) => {
@@ -418,9 +452,12 @@ export function AssistantChat({
                   >
                     <ChannelAvatar id={item.id} />
                     <span className="chat-row-text">
-                      <span className="chat-row-name">{item.name}</span>
+                      <span className="chat-row-name">
+                        {item.name}
+                        {inPage && <span className="chat-row-role"> · {item.worker}</span>}
+                      </span>
                       <span className="chat-row-preview" data-fresh={fresh}>
-                        {busy ? "מקליד…" : last ? `${last.role === "user" ? "אתם: " : ""}${last.content.replace(/\s+/g, " ")}` : item.about}
+                        {busy ? "עובד על זה…" : last ? `${last.role === "user" ? "אתם: " : ""}${last.content.replace(/\s+/g, " ")}` : item.about}
                       </span>
                     </span>
                     {(last || fresh) && (
@@ -446,7 +483,7 @@ export function AssistantChat({
               <ChannelAvatar id={active} />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="truncate font-medium leading-tight">{title}</p>
+              <p className="truncate font-medium leading-tight">{inPage ? `${channel.name} · ${channel.worker}` : title}</p>
               <p className="truncate text-xs text-muted" aria-live="polite">
                 {waiting ? "מקליד…" : `עונה מתוך נתוני העסק · ${channel.about}`}
               </p>
@@ -489,9 +526,11 @@ export function AssistantChat({
                 <path d="M4 12a8 8 0 1 0 2.6-5.9M4 4v4.5h4.5" />
               </svg>
             </button>
-            <button type="button" className="chat-head-btn" onClick={close} aria-label="סגירת הצ׳אט" title="סגירה">
-              <CloseIcon />
-            </button>
+            {!inPage && (
+              <button type="button" className="chat-head-btn" onClick={close} aria-label="סגירת הצ׳אט" title="סגירה">
+                <CloseIcon />
+              </button>
+            )}
           </header>
 
           <div ref={log} className="chat-log">
@@ -544,12 +583,12 @@ export function AssistantChat({
           </div>
 
           <form onSubmit={onSubmit} className="chat-compose">
-            <label className="sr-only" htmlFor="assistant-input">
+            <label className="sr-only" htmlFor={inputId}>
               הודעה לצ׳אט {channel.name}
             </label>
             <textarea
               ref={input}
-              id="assistant-input"
+              id={inputId}
               className="chat-input"
               rows={1}
               maxLength={2000}

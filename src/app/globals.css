@@ -1557,6 +1557,32 @@ html {
     display: none;
   }
 }
+/* The workers page: the same panel, sitting in the page instead of floating over it. */
+.chat-panel.is-page {
+  position: relative;
+  inset: auto;
+  z-index: auto;
+  width: 100%;
+  height: min(46rem, calc(100dvh - 15rem));
+  min-height: 30rem;
+  border-radius: 20px;
+  box-shadow:
+    0 0 0 1px var(--rule),
+    inset 0 1px var(--hl),
+    var(--elevation-md);
+  clip-path: none;
+}
+@media (min-width: 900px) {
+  .chat-panel.is-page[data-view] .chat-list {
+    width: 20rem;
+  }
+}
+.chat-row-role {
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-weight: 400;
+}
+
 .chat-list-head {
   display: flex;
   align-items: center;

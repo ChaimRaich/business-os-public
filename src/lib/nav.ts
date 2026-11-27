@@ -10,6 +10,7 @@ export type Area = NavLink & {
 // The top row is what the business runs on; each area keeps its own screens below it.
 export const AREAS: Area[] = [
   { href: "/", label: "ראשי", paths: [] },
+  { href: "/workers", label: "עובדים", paths: ["/workers"] },
   {
     href: "/products",
     label: "מלאי",

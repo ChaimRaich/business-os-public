@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
+  Bot,
   FileUp,
   Landmark,
   LayoutDashboard,
@@ -39,6 +40,14 @@ const COMMANDS: readonly CommandItem[] = [
     keywords: "ראשי דשבורד בית home dashboard",
     href: "/",
     icon: LayoutDashboard,
+  },
+  {
+    id: "workers",
+    label: "עובדים",
+    subtitle: "הצ׳אטים של העסק: מנהל העבודה ועובד לכל תחום",
+    keywords: "עובדים צאט צ׳אט עוזר שיחה workers chat assistant",
+    href: "/workers",
+    icon: Bot,
   },
   {
     id: "rec-new",

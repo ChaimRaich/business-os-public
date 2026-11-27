@@ -27,7 +27,7 @@ async function Shell({ children }: { children: React.ReactNode }) {
     return (
       <CreateBusinessCard
         footer={
-          <form action={logout}>
+          <form action={logout} data-logout>
             <button type="submit" className="min-h-11 px-3 underline-offset-4 hover:underline">
               יציאה מהחשבון
             </button>
@@ -59,7 +59,7 @@ async function Shell({ children }: { children: React.ReactNode }) {
                 <CommandPaletteTrigger canManage={canManage} />
                 <ThemeToggle />
               </span>
-              <form action={logout} className="ms-2">
+              <form action={logout} className="ms-2" data-logout>
                 <button type="submit" className="btn-quiet" title={user.email}>
                   יציאה
                 </button>
@@ -69,7 +69,13 @@ async function Shell({ children }: { children: React.ReactNode }) {
         </SiteHeader>
         <main className="rail flex-1 py-8 sm:py-10">{children}</main>
         <SiteFooter />
-        <AssistantChat businessName={active.businessName} />
+        <AssistantChat
+          key={active.businessId}
+          businessName={active.businessName}
+          businessId={active.businessId}
+          userId={user.id}
+          canManage={canManage}
+        />
       </div>
       <FooterArt />
     </>

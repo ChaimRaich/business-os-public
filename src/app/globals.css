@@ -1475,7 +1475,6 @@ html {
   bottom: 1.25rem;
   z-index: 71;
   display: flex;
-  flex-direction: column;
   width: min(27rem, calc(100vw - 2.5rem));
   height: min(44rem, calc(100dvh - 2.5rem));
   overflow: hidden;
@@ -1517,6 +1516,209 @@ html {
     right: 1rem;
     bottom: 1rem;
   }
+}
+
+/* The panel holds the list of chats and the open conversation. Wide screens show both;
+   narrow ones show one at a time. */
+.chat-thread {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.chat-list {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: color-mix(in srgb, var(--raised) 40%, var(--frame));
+}
+.chat-panel[data-view="chat"] .chat-list,
+.chat-panel[data-view="list"] .chat-thread {
+  display: none;
+}
+@media (min-width: 900px) {
+  .chat-panel {
+    width: min(50rem, calc(100vw - 2.5rem));
+  }
+  .chat-panel[data-view] .chat-list {
+    display: flex;
+    flex: none;
+    width: 17.5rem;
+    border-inline-end: 1px solid var(--rule);
+  }
+  .chat-panel[data-view] .chat-thread {
+    display: flex;
+  }
+  .chat-narrow-only {
+    display: none;
+  }
+}
+.chat-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 3.75rem;
+  padding: 0.5rem 1rem;
+}
+.chat-rows {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+  padding: 0 0.5rem 0.75rem;
+  overscroll-behavior: contain;
+}
+.chat-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  min-height: 3.75rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 14px;
+  text-align: start;
+  transition: background-color 0.2s;
+}
+.chat-row:hover {
+  background: var(--raised);
+}
+.chat-row[aria-current="true"] {
+  background: var(--accent-soft);
+}
+.chat-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+/* The main chat stands apart at the top, as the one that knows everything. */
+.chat-row[data-main="true"] {
+  margin-bottom: 0.5rem;
+  padding-block: 0.8rem;
+  border: 1px solid var(--rule);
+  background: var(--frame);
+  box-shadow: inset 0 1px var(--hl);
+}
+.chat-row[data-main="true"]:hover {
+  background: var(--raised);
+}
+.chat-row[data-main="true"][aria-current="true"] {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  background: var(--accent-soft);
+}
+.chat-row-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  gap: 0.1rem;
+}
+.chat-row-name {
+  font-weight: 500;
+  line-height: 1.3;
+}
+.chat-row-preview {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chat-row-preview[data-fresh="true"] {
+  color: var(--ink);
+  font-weight: 500;
+}
+.chat-row-side {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+.chat-row-dot {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 999px;
+  background: var(--accent);
+}
+.chat-head-btn:has(.chat-back-dot) {
+  position: relative;
+}
+.chat-back-dot {
+  position: absolute;
+  top: 0.35rem;
+  left: 0.35rem;
+}
+.chat-unread {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  min-width: 1.35rem;
+  height: 1.35rem;
+  padding-inline: 0.3rem;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #04262b;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+/* One colour per area, so a chat is recognised before its name is read. */
+.chat-ava {
+  position: relative;
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 999px;
+  background: var(--ava, var(--raised));
+  color: #101314;
+}
+.chat-ava .logo-tile {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 999px;
+}
+.chat-ava[data-channel="inventory"] {
+  --ava: #4cc38a;
+}
+.chat-ava[data-channel="receiving"] {
+  --ava: #f0a04b;
+}
+.chat-ava[data-channel="sales"] {
+  --ava: #6aa5f5;
+}
+.chat-ava[data-channel="marketing"] {
+  --ava: #ee6fb0;
+}
+.chat-ava[data-channel="customers"] {
+  --ava: #a78bfa;
+}
+.chat-ava[data-channel="money"] {
+  --ava: #3fc7ba;
+}
+.chat-ava-star {
+  position: absolute;
+  bottom: -2px;
+  left: -2px;
+  display: grid;
+  place-items: center;
+  width: 1.05rem;
+  height: 1.05rem;
+  border: 2px solid var(--frame);
+  border-radius: 999px;
+  background: #f0a04b;
+  color: #fff;
+}
+/* In the conversation header the avatar carries the "online" dot, not the star. */
+.chat-avatar .chat-ava-star {
+  display: none;
 }
 
 .chat-head-btn {

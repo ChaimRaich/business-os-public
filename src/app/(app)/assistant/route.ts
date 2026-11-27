@@ -1,5 +1,7 @@
 import type { NextRequest } from "next/server";
 import { getBusinessContext } from "@/lib/auth";
+import { can } from "@/lib/permissions";
+import { channelById, isChannelId } from "@/lib/assistant-channels";
 import { askAssistant, AssistantError, type AssistantFailure, type ChatMessage } from "@/lib/assistant";
 
 const MAX_TURNS = 16;
@@ -31,7 +33,7 @@ function parseMessages(input: unknown): ChatMessage[] | null {
   return messages;
 }
 
-/** One turn of the business chat. The business comes from the session, never from the request. */
+/** One turn of one of the business chats. The business comes from the session, never from the request. */
 export async function POST(request: NextRequest) {
   const context = await getBusinessContext();
   if (!context) {
@@ -43,13 +45,17 @@ export async function POST(request: NextRequest) {
   } catch {
     return json({ error: "הבקשה לא תקינה." }, 400);
   }
-  const messages = parseMessages((payload as { messages?: unknown } | null)?.messages);
-  if (!messages) {
+  const { messages: rawMessages, channel = "main" } = (payload ?? {}) as { messages?: unknown; channel?: unknown };
+  const messages = parseMessages(rawMessages);
+  if (!messages || !isChannelId(channel)) {
     return json({ error: "הבקשה לא תקינה." }, 400);
+  }
+  if (channelById(channel).managersOnly && !can(context.active.role, "accounting.view")) {
+    return json({ error: "הצ׳אט הזה פתוח לבעלים ולמנהלים בלבד." }, 403);
   }
 
   try {
-    return json({ reply: await askAssistant(context, messages) });
+    return json({ reply: await askAssistant(context, channel, messages) });
   } catch (error) {
     if (error instanceof AssistantError) {
       console.error(`Assistant failed (${error.reason}): ${error.message}`);

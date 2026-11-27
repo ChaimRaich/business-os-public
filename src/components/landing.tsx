@@ -188,7 +188,7 @@ const FEATURES = [
   },
 ];
 
-/** What the system starts on its own. `soon` marks what is planned and not built yet. */
+/** What the system starts on its own. The last three are planned and not built yet. */
 const INITIATIVES = [
   {
     glyph: "↓",
@@ -213,21 +213,18 @@ const INITIATIVES = [
     tone: "#4a9bff",
     title: "הזמנה שיוצאת לספק לבד",
     body: "ההזמנה תישלח לספק במייל מעצמה, לפי כללים שתקבעו: איזה ספק, מאיזו כמות ובאיזה יום.",
-    soon: true,
   },
   {
     glyph: "↗",
     tone: "#ff6b9d",
     title: "מבצע שעולה לרשתות",
     body: "הפוסטים של המבצע יתפרסמו באינסטגרם ובפייסבוק ישירות מהמערכת, אחרי האישור שלכם.",
-    soon: true,
   },
   {
     glyph: "!",
     tone: "#3ccf7a",
     title: "הודעה לטלפון כשיש יוזמה",
     body: "הודעה בוואטסאפ או במייל ברגע שהמערכת הכינה משהו שמחכה לאישור, בלי להיכנס לבדוק.",
-    soon: true,
   },
 ];
 
@@ -323,12 +320,9 @@ export function LandingSections({ cta }: { cta: { href: string; label: string } 
         <div className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {INITIATIVES.map((item, index) => (
             <article key={item.title} className="card lift spot reveal" suppressHydrationWarning style={vars({ "--d": index % 3 })}>
-              <div className="flex items-center justify-between gap-3">
-                <span className="glyph size-9! rounded-[9px]! text-base!" style={vars({ "--glyph": item.tone })} aria-hidden="true">
-                  {item.glyph}
-                </span>
-                {item.soon && <span className="chip chip-warn">בקרוב</span>}
-              </div>
+              <span className="glyph size-9! rounded-[9px]! text-base!" style={vars({ "--glyph": item.tone })} aria-hidden="true">
+                {item.glyph}
+              </span>
               <h3 className="display mt-4 text-xl">{item.title}</h3>
               <p className="mt-2 text-sm leading-relaxed text-muted">{item.body}</p>
             </article>
